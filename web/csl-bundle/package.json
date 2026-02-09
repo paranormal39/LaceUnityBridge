@@ -1,0 +1,15 @@
+{
+  "name": "csl-bundle",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "build:copy": "node build.mjs && node copy.mjs"
+  },
+  "dependencies": {
+    "@emurgo/cardano-serialization-lib-browser": "11.5.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.0"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "templatedata",
+  "version": "1.0.0",
+  "description": "",
+  "main": "csl.bundle.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@emurgo/cardano-serialization-lib-browser": "^12.1.0",
+    "esbuild": "^0.27.2"
+  }
+}

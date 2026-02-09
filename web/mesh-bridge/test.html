@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>MeshSDK Bundle Test</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1a1a2e; color: #eee; }
+    .pass { color: #4ade80; }
+    .fail { color: #f87171; }
+    .warn { color: #fbbf24; }
+    pre { background: #16213e; padding: 10px; border-radius: 4px; overflow-x: auto; }
+    button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>MeshSDK Bundle Test</h1>
+  <div id="output"></div>
+  
+  <!-- 1. libsodium from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/libsodium-sumo@0.7.13/dist/modules-sumo/libsodium-sumo.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/libsodium-wrappers-sumo@0.7.13/dist/modules-sumo/libsodium-wrappers.js"></script>
+  <script>
+    window.libsodiumReady = new Promise(function(resolve, reject) {
+      if (typeof sodium !== 'undefined' && sodium.ready) {
+        sodium.ready.then(function() {
+          window.sodium = sodium;
+          resolve(sodium);
+        }).catch(reject);
+      } else {
+        resolve(null);
+      }
+    });
+  </script>
+  
+  <!-- 2. MeshSDK bundle -->
+  <script src="dist/mesh-sdk.bundle.js"></script>
+  
+  <script>
+    const output = document.getElementById('output');
+    
+    function log(msg, status = 'info') {
+      const div = document.createElement('div');
+      div.className = status;
+      div.textContent = msg;
+      output.appendChild(div);
+      console.log(msg);
+    }
+    
+    async function runTests() {
+      log('=== MeshSDK Bundle Test ===');
+      log('');
+      
+      // Test 1: Check window.MeshSDK exists
+      if (typeof window.MeshSDK !== 'undefined') {
+        log('✓ window.MeshSDK exists', 'pass');
+      } else {
+        log('✗ window.MeshSDK is undefined', 'fail');
+        return;
+      }
+      
+      // Test 2: Check exports
+      const exports = Object.keys(window.MeshSDK);
+      log(`✓ MeshSDK has ${exports.length} exports: ${exports.slice(0, 8).join(', ')}...`, 'pass');
+      
+      // Test 3: Check BlockfrostProvider
+      if (typeof window.MeshSDK.BlockfrostProvider === 'function') {
+        log('✓ BlockfrostProvider is a function', 'pass');
+      } else {
+        log('✗ BlockfrostProvider missing or not a function', 'fail');
+      }
+      
+      // Test 4: Check MeshTxBuilder
+      if (typeof window.MeshSDK.MeshTxBuilder === 'function') {
+        log('✓ MeshTxBuilder is a function', 'pass');
+      } else {
+        log('✗ MeshTxBuilder missing or not a function', 'fail');
+      }
+      
+      // Test 5: Wait for ready
+      log('');
+      log('Waiting for MeshSDKReadyPromise...');
+      try {
+        await window.MeshSDKReadyPromise;
+        if (window.MeshSDKReady) {
+          log('✓ MeshSDK is ready', 'pass');
+        } else {
+          log('⚠ MeshSDKReadyPromise resolved but MeshSDKReady is false', 'warn');
+        }
+        if (window.MeshSDKError) {
+          log('⚠ MeshSDKError: ' + window.MeshSDKError, 'warn');
+        }
+      } catch (e) {
+        log('✗ MeshSDKReadyPromise rejected: ' + e.message, 'fail');
+      }
+      
+      // Test 6: Try deserializeAddress
+      log('');
+      log('Testing deserializeAddress...');
+      try {
+        const addr = 'addr_test1qz2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3jcu5d8ps7zex2k2xt3uqxgjqnnj83ws8lhrn648jjxtwq2ytjqp';
+        const result = window.MeshSDK.deserializeAddress(addr);
+        log('✓ deserializeAddress works: ' + JSON.stringify(result).slice(0, 80) + '...', 'pass');
+      } catch (e) {
+        log('✗ deserializeAddress failed: ' + e.message, 'fail');
+      }
+      
+      // Test 7: Try creating BlockfrostProvider (no API call)
+      log('');
+      log('Testing BlockfrostProvider instantiation...');
+      try {
+        const provider = new window.MeshSDK.BlockfrostProvider('test-key');
+        log('✓ BlockfrostProvider instantiated', 'pass');
+      } catch (e) {
+        log('✗ BlockfrostProvider failed: ' + e.message, 'fail');
+      }
+      
+      log('');
+      log('=== Tests Complete ===');
+    }
+    
+    // Run tests after a short delay to ensure everything is loaded
+    setTimeout(runTests, 500);
+  </script>
+</body>
+</html>

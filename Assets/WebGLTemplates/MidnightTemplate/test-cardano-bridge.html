@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Cardano Bridge Test</title>
+  <style>
+    body { font-family: system-ui, sans-serif; padding: 20px; background: #1a1a2e; color: #eee; max-width: 800px; margin: 0 auto; }
+    h1 { color: #4ade80; }
+    button { padding: 10px 20px; margin: 5px; cursor: pointer; background: #3b82f6; color: white; border: none; border-radius: 4px; }
+    button:hover { background: #2563eb; }
+    button:disabled { background: #666; cursor: not-allowed; }
+    .section { background: #16213e; padding: 15px; margin: 10px 0; border-radius: 8px; }
+    .pass { color: #4ade80; }
+    .fail { color: #f87171; }
+    .warn { color: #fbbf24; }
+    pre { background: #0f172a; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 12px; }
+    input { padding: 8px; margin: 5px; width: 300px; }
+    #log { max-height: 300px; overflow-y: auto; }
+  </style>
+</head>
+<body>
+  <h1>🔗 Cardano Bridge Test</h1>
+  
+  <div class="section">
+    <h3>1. Initialization</h3>
+    <div id="init-status">Loading...</div>
+  </div>
+
+  <div class="section">
+    <h3>2. Wallet Connection</h3>
+    <div id="wallet-status">Not connected</div>
+    <button id="btn-connect" onclick="connectWallet()">Connect Lace</button>
+    <button id="btn-disconnect" onclick="disconnectWallet()" disabled>Disconnect</button>
+  </div>
+
+  <div class="section">
+    <h3>3. Wallet Info</h3>
+    <button onclick="getBalance()" id="btn-balance" disabled>Get Balance</button>
+    <button onclick="getAddresses()" id="btn-addresses" disabled>Get Addresses</button>
+    <button onclick="getUtxos()" id="btn-utxos" disabled>Get UTxOs</button>
+    <div id="wallet-info"></div>
+  </div>
+
+  <div class="section">
+    <h3>4. Send Payment</h3>
+    <div>
+      <input type="text" id="recipient" placeholder="Recipient address (addr_test1...)" />
+    </div>
+    <div>
+      <input type="number" id="amount" placeholder="Amount in ADA" value="2" />
+    </div>
+    <button onclick="sendPayment()" id="btn-send" disabled>Send Payment</button>
+    <div id="tx-result"></div>
+  </div>
+
+  <div class="section">
+    <h3>Console Log</h3>
+    <pre id="log"></pre>
+  </div>
+
+  <!-- CSL bundle (locally built) -->
+  <script src="TemplateData/csl.bundle.js"></script>
+  
+  <!-- Cardano Bridge -->
+  <script src="cardano-bridge.js"></script>
+  
+  <script>
+    const log = (msg, type = 'info') => {
+      const el = document.getElementById('log');
+      const time = new Date().toLocaleTimeString();
+      const color = type === 'pass' ? '#4ade80' : type === 'fail' ? '#f87171' : type === 'warn' ? '#fbbf24' : '#eee';
+      el.innerHTML += `<span style="color:${color}">[${time}] ${msg}</span>\n`;
+      el.scrollTop = el.scrollHeight;
+      console.log(msg);
+    };
+
+    // Initialize
+    async function init() {
+      const statusEl = document.getElementById('init-status');
+      
+      try {
+        // Check CSL (loaded synchronously from local bundle)
+        if (typeof window.CardanoWasm === 'undefined') {
+          throw new Error('CSL not loaded - check TemplateData/csl.bundle.js');
+        }
+        log('✓ CSL loaded', 'pass');
+        log('  CSL exports: ' + Object.keys(window.CardanoWasm).slice(0, 8).join(', ') + '...');
+        
+        // Check CardanoBridge
+        if (typeof window.CardanoBridge === 'undefined') {
+          throw new Error('CardanoBridge not loaded');
+        }
+        log('✓ CardanoBridge loaded', 'pass');
+        
+        // Initialize bridge
+        await window.CardanoBridge.init();
+        log('✓ CardanoBridge initialized', 'pass');
+        
+        // Check wallets
+        const wallets = window.CardanoBridge.getAvailableWallets();
+        log(`Available wallets: ${wallets.join(', ') || 'none'}`, wallets.length ? 'pass' : 'warn');
+        
+        if (window.CardanoBridge.isLaceAvailable()) {
+          log('✓ Lace wallet detected', 'pass');
+          statusEl.innerHTML = '<span class="pass">✓ Ready - Lace available</span>';
+        } else {
+          log('⚠ Lace not detected', 'warn');
+          statusEl.innerHTML = '<span class="warn">⚠ Ready - Lace not detected (install extension)</span>';
+        }
+        
+      } catch (err) {
+        log('✗ Init failed: ' + err.message, 'fail');
+        statusEl.innerHTML = `<span class="fail">✗ ${err.message}</span>`;
+      }
+    }
+
+    // Connect wallet
+    async function connectWallet() {
+      const statusEl = document.getElementById('wallet-status');
+      const connectBtn = document.getElementById('btn-connect');
+      
+      try {
+        connectBtn.disabled = true;
+        statusEl.textContent = 'Connecting...';
+        log('Connecting to Lace...');
+        
+        const result = await window.CardanoBridge.connectWallet('lace');
+        
+        log(`✓ Connected to ${result.wallet} on ${result.networkName}`, 'pass');
+        statusEl.innerHTML = `<span class="pass">✓ Connected to ${result.wallet} (${result.networkName})</span>`;
+        
+        document.getElementById('btn-disconnect').disabled = false;
+        document.getElementById('btn-balance').disabled = false;
+        document.getElementById('btn-addresses').disabled = false;
+        document.getElementById('btn-utxos').disabled = false;
+        document.getElementById('btn-send').disabled = false;
+        
+      } catch (err) {
+        log('✗ Connection failed: ' + err.message, 'fail');
+        statusEl.innerHTML = `<span class="fail">✗ ${err.message}</span>`;
+        connectBtn.disabled = false;
+      }
+    }
+
+    // Disconnect
+    function disconnectWallet() {
+      window.CardanoBridge.disconnectWallet();
+      document.getElementById('wallet-status').textContent = 'Disconnected';
+      document.getElementById('btn-connect').disabled = false;
+      document.getElementById('btn-disconnect').disabled = true;
+      document.getElementById('btn-balance').disabled = true;
+      document.getElementById('btn-addresses').disabled = true;
+      document.getElementById('btn-utxos').disabled = true;
+      document.getElementById('btn-send').disabled = true;
+      log('Disconnected');
+    }
+
+    // Get balance
+    async function getBalance() {
+      const infoEl = document.getElementById('wallet-info');
+      try {
+        const balance = await window.CardanoBridge.getBalance();
+        const ada = (parseInt(balance) / 1000000).toFixed(6);
+        infoEl.innerHTML = `<strong>Balance:</strong> ${ada} ADA (${balance} lovelace)`;
+        log(`Balance: ${ada} ADA`, 'pass');
+      } catch (err) {
+        infoEl.innerHTML = `<span class="fail">Error: ${err.message}</span>`;
+        log('✗ ' + err.message, 'fail');
+      }
+    }
+
+    // Get addresses
+    async function getAddresses() {
+      const infoEl = document.getElementById('wallet-info');
+      try {
+        const addresses = await window.CardanoBridge.getUsedAddressesBech32();
+        infoEl.innerHTML = `<strong>Addresses:</strong><br>${addresses.map(a => `<code>${a}</code>`).join('<br>')}`;
+        log(`Found ${addresses.length} addresses`, 'pass');
+      } catch (err) {
+        infoEl.innerHTML = `<span class="fail">Error: ${err.message}</span>`;
+        log('✗ ' + err.message, 'fail');
+      }
+    }
+
+    // Get UTxOs
+    async function getUtxos() {
+      const infoEl = document.getElementById('wallet-info');
+      try {
+        const utxos = await window.CardanoBridge.getUtxos();
+        infoEl.innerHTML = `<strong>UTxOs (${utxos.length}):</strong><pre>${JSON.stringify(utxos, null, 2)}</pre>`;
+        log(`Found ${utxos.length} UTxOs`, 'pass');
+      } catch (err) {
+        infoEl.innerHTML = `<span class="fail">Error: ${err.message}</span>`;
+        log('✗ ' + err.message, 'fail');
+      }
+    }
+
+    // Send payment
+    async function sendPayment() {
+      const recipient = document.getElementById('recipient').value.trim();
+      const amount = parseFloat(document.getElementById('amount').value);
+      const resultEl = document.getElementById('tx-result');
+      const sendBtn = document.getElementById('btn-send');
+      
+      if (!recipient) {
+        resultEl.innerHTML = '<span class="fail">Enter recipient address</span>';
+        return;
+      }
+      if (!amount || amount <= 0) {
+        resultEl.innerHTML = '<span class="fail">Enter valid amount</span>';
+        return;
+      }
+      
+      const lovelace = Math.floor(amount * 1000000).toString();
+      
+      try {
+        sendBtn.disabled = true;
+        resultEl.textContent = 'Building transaction...';
+        log(`Sending ${amount} ADA to ${recipient.slice(0, 20)}...`);
+        
+        const result = await window.CardanoBridge.buildAndSendPayment(recipient, lovelace);
+        
+        resultEl.innerHTML = `<span class="pass">✓ Transaction submitted!</span><br>
+          <a href="https://preprod.cardanoscan.io/transaction/${result.txHash}" target="_blank" style="color:#3b82f6">
+            View on Explorer: ${result.txHash.slice(0, 16)}...
+          </a>`;
+        log(`✓ TX submitted: ${result.txHash}`, 'pass');
+        
+      } catch (err) {
+        resultEl.innerHTML = `<span class="fail">✗ ${err.message}</span>`;
+        log('✗ ' + err.message, 'fail');
+      } finally {
+        sendBtn.disabled = false;
+      }
+    }
+
+    // Start
+    init();
+  </script>
+</body>
+</html>

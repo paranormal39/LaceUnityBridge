@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Midnight Wallet Detection Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #1a1a2e; color: #eee; }
+        .status { padding: 15px; margin: 10px 0; border-radius: 8px; }
+        .found { background: #2d5a27; }
+        .not-found { background: #5a2727; }
+        .info { background: #27415a; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; margin: 5px; }
+        pre { background: #0d0d1a; padding: 15px; border-radius: 8px; overflow-x: auto; }
+        h1 { color: #7b68ee; }
+    </style>
+</head>
+<body>
+    <h1>Midnight Wallet Detection Test</h1>
+    <p>This page tests if Lace Midnight Preview is injecting the wallet connector.</p>
+    
+    <div id="status" class="status info">Checking...</div>
+    
+    <h3>Actions</h3>
+    <button onclick="checkWallet()">Check Wallet Now</button>
+    <button onclick="checkDelayed()">Check After 3s Delay</button>
+    <button onclick="tryConnect()">Try Connect</button>
+    
+    <h3>Console Output</h3>
+    <pre id="log"></pre>
+
+    <script>
+        function log(msg) {
+            console.log(msg);
+            document.getElementById('log').textContent += msg + '\n';
+        }
+
+        function setStatus(msg, found) {
+            var el = document.getElementById('status');
+            el.textContent = msg;
+            el.className = 'status ' + (found ? 'found' : 'not-found');
+        }
+
+        function checkWallet() {
+            log('\n=== Checking wallet ===');
+            log('Time: ' + new Date().toISOString());
+            
+            // Check window.midnight
+            log('window.midnight: ' + (window.midnight ? 'EXISTS' : 'not present'));
+            if (window.midnight) {
+                log('  typeof: ' + typeof window.midnight);
+                log('  keys: ' + Object.keys(window.midnight).join(', '));
+                
+                if (typeof window.midnight.enable === 'function') {
+                    log('  HAS enable() - direct connector!');
+                    setStatus('Found: window.midnight (direct connector)', true);
+                    return;
+                }
+                
+                // Check sub-keys
+                Object.keys(window.midnight).forEach(function(key) {
+                    var val = window.midnight[key];
+                    if (val && typeof val === 'object') {
+                        log('  .' + key + ': ' + Object.keys(val).join(', '));
+                        if (typeof val.enable === 'function') {
+                            log('    ^ HAS enable() - wallet connector!');
+                            setStatus('Found: window.midnight.' + key, true);
+                        }
+                    }
+                });
+            }
+            
+            // Check window.cardano
+            log('window.cardano: ' + (window.cardano ? 'EXISTS' : 'not present'));
+            if (window.cardano) {
+                log('  keys: ' + Object.keys(window.cardano).join(', '));
+                
+                Object.keys(window.cardano).forEach(function(key) {
+                    var val = window.cardano[key];
+                    if (val && typeof val === 'object' && typeof val.enable === 'function') {
+                        log('  .' + key + ': HAS enable() - wallet connector!');
+                        if (val.name) log('    name: ' + val.name);
+                    }
+                });
+                
+                if (window.cardano.midnight) {
+                    setStatus('Found: window.cardano.midnight', true);
+                    return;
+                }
+                if (window.cardano.lace) {
+                    setStatus('Found: window.cardano.lace', true);
+                    return;
+                }
+            }
+            
+            if (!window.midnight && !window.cardano) {
+                setStatus('NOT FOUND: Neither window.midnight nor window.cardano exist', false);
+                log('\n*** WALLET NOT DETECTED ***');
+                log('Possible causes:');
+                log('1. Lace Midnight Preview extension not installed');
+                log('2. Extension not enabled for this site');
+                log('3. Page loaded before extension injected (try refresh)');
+                log('4. Running on file:// URL (must use http:// or https://)');
+            }
+        }
+
+        function checkDelayed() {
+            log('\nWaiting 3 seconds...');
+            setStatus('Waiting 3 seconds...', false);
+            setTimeout(function() {
+                log('Delayed check starting...');
+                checkWallet();
+            }, 3000);
+        }
+
+        async function tryConnect() {
+            log('\n=== Attempting connection ===');
+            
+            var connector = null;
+            var path = '';
+            
+            // Find connector
+            if (window.midnight) {
+                if (typeof window.midnight.enable === 'function') {
+                    connector = window.midnight;
+                    path = 'window.midnight';
+                } else {
+                    var keys = Object.keys(window.midnight);
+                    for (var i = 0; i < keys.length; i++) {
+                        var key = keys[i];
+                        if (window.midnight[key] && typeof window.midnight[key].enable === 'function') {
+                            connector = window.midnight[key];
+                            path = 'window.midnight.' + key;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            if (!connector && window.cardano) {
+                if (window.cardano.midnight && typeof window.cardano.midnight.enable === 'function') {
+                    connector = window.cardano.midnight;
+                    path = 'window.cardano.midnight';
+                } else if (window.cardano.lace && typeof window.cardano.lace.enable === 'function') {
+                    connector = window.cardano.lace;
+                    path = 'window.cardano.lace';
+                }
+            }
+            
+            if (!connector) {
+                log('ERROR: No connector found');
+                setStatus('Cannot connect - no wallet found', false);
+                return;
+            }
+            
+            log('Using connector at: ' + path);
+            
+            try {
+                log('Calling enable()...');
+                var api = await connector.enable();
+                log('enable() returned: ' + (api ? 'API object' : 'null'));
+                
+                if (api) {
+                    log('API keys: ' + Object.keys(api).join(', '));
+                    
+                    if (typeof api.state === 'function') {
+                        log('Calling api.state()...');
+                        var state = await api.state();
+                        log('state() returned: ' + JSON.stringify(state, null, 2));
+                        
+                        if (state && state.address) {
+                            setStatus('CONNECTED! Address: ' + state.address.substring(0, 20) + '...', true);
+                        }
+                    }
+                }
+            } catch (err) {
+                log('ERROR: ' + err.message);
+                setStatus('Connection error: ' + err.message, false);
+            }
+        }
+
+        // Initial check on page load
+        window.addEventListener('load', function() {
+            log('Page loaded at: ' + new Date().toISOString());
+            log('URL: ' + window.location.href);
+            log('Protocol: ' + window.location.protocol);
+            checkWallet();
+        });
+
+        // Also check after a short delay (extensions may inject late)
+        setTimeout(function() {
+            log('\n--- Auto-check after 1.5s ---');
+            checkWallet();
+        }, 1500);
+    </script>
+</body>
+</html>

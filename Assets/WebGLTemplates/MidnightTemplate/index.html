@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>{{{ PRODUCT_NAME }}}</title>
+  <link rel="shortcut icon" href="TemplateData/favicon.ico">
+  <link rel="stylesheet" href="TemplateData/style.css">
+  
+  <!-- ============================================================ -->
+  <!-- CBOR decoder for Cardano multi-asset balance parsing         -->
+  <!-- ============================================================ -->
+  <script src="https://cdn.jsdelivr.net/npm/cbor-js@0.1.0/cbor.min.js"></script>
+  
+  <!-- ============================================================ -->
+  <!-- Cardano Serialization Library (CSL) - WASM for tx building   -->
+  <!-- Bundle fetches WASM at runtime from cardano_serialization_lib_bg.wasm -->
+  <!-- Exposes window.CSL after initialization                      -->
+  <!-- ============================================================ -->
+  <!-- blake2b-256 is now embedded inline in increment-counter-csl.js -->
+  <script src="TemplateData/csl.bundle.js"></script>
+  <script src="TemplateData/csl-loader.js"></script>
+  <script>
+    // Wait for CSL to initialize before proceeding
+    window.addEventListener('csl-ready', function() {
+      console.log('[Template] CSL ready! window.CSL:', typeof window.CSL);
+      console.log('[Template] CSL exports:', window.CSL ? Object.keys(window.CSL).filter(k => !k.startsWith('__')).slice(0, 10) : 'none');
+    });
+  </script>
+  
+  <!-- ============================================================ -->
+  <!-- IncrementCounterCSL - Pure CSL + CIP-30 + Blockfrost         -->
+  <!-- Implements Plutus V2 counter increment transaction           -->
+  <!-- ============================================================ -->
+  <script src="increment-counter-csl.js"></script>
+  
+  <!-- ============================================================ -->
+  <!-- Cardano CIP-30 Bridge - Wallet connection utilities          -->
+  <!-- ============================================================ -->
+  <script src="cardano-bridge.js"></script>
+  
+  <script>
+    // Initialize Cardano Bridge (CSL bundle auto-sets window.CardanoWasm)
+    (function() {
+      console.log("[MidnightTemplate] Initializing Cardano Bridge...");
+      if (typeof window.CardanoBridge !== 'undefined') {
+        window.CardanoBridge.init()
+          .then(function() {
+            window.CardanoBridgeReady = true;
+            console.log("[MidnightTemplate] Cardano Bridge ready");
+            console.log("[MidnightTemplate] Available wallets:", window.CardanoBridge.getAvailableWallets());
+          })
+          .catch(function(err) {
+            console.error("[MidnightTemplate] Cardano Bridge init failed:", err);
+            window.CardanoBridgeReady = false;
+            window.CardanoBridgeError = err.message;
+          });
+      } else {
+        console.error("[MidnightTemplate] CardanoBridge not loaded");
+      }
+    })();
+  </script>
+  
+  <!-- ============================================================ -->
+  <!-- Midnight Counter Bindings - MUST load BEFORE Unity loader    -->
+  <!-- ============================================================ -->
+  <!-- 
+    IMPORTANT: If you have bundled the Midnight JS SDK, include it here:
+    <script src="midnight-sdk-bundle.js"></script>
+    
+    The SDK bundle should expose window.MidnightSDK with:
+      - MidnightSDK.Counter (from @midnight-ntwrk/counter-contract)
+      - MidnightSDK.witnesses (from @midnight-ntwrk/counter-contract)
+      - MidnightSDK.indexerPublicDataProvider (from @midnight-ntwrk/midnight-js-indexer-public-data-provider)
+      - MidnightSDK.findDeployedContract (from @midnight-ntwrk/midnight-js-contracts)
+      - MidnightSDK.buildCircuitTransaction (custom helper for building transactions)
+  -->
+  <script src="midnight-counter-bindings.js"></script>
+  <!-- ============================================================ -->
+</head>
+<body>
+  <div id="unity-container" class="unity-desktop">
+    <canvas id="unity-canvas" width=960 height=600 tabindex="-1"></canvas>
+    <div id="unity-loading-bar">
+      <div id="unity-logo"></div>
+      <div id="unity-progress-bar-empty">
+        <div id="unity-progress-bar-full"></div>
+      </div>
+    </div>
+    <div id="unity-warning"> </div>
+    <div id="unity-footer">
+      <div id="unity-webgl-logo"></div>
+      <div id="unity-fullscreen-button"></div>
+      <div id="unity-build-title">{{{ PRODUCT_NAME }}}</div>
+    </div>
+  </div>
+  <script>
+    var container = document.querySelector("#unity-container");
+    var canvas = document.querySelector("#unity-canvas");
+    var loadingBar = document.querySelector("#unity-loading-bar");
+    var progressBarFull = document.querySelector("#unity-progress-bar-full");
+    var fullscreenButton = document.querySelector("#unity-fullscreen-button");
+    var warningBanner = document.querySelector("#unity-warning");
+
+    // Shows a temporary message banner/ribbon for a few seconds, or
+    // temporary error message for 5 seconds.
+    function unityShowBanner(msg, type) {
+      function updateBannerVisibility() {
+        warningBanner.style.display = warningBanner.innerHTML ? 'block' : 'none';
+      }
+      var div = document.createElement('div');
+      div.innerHTML = msg;
+      warningBanner.appendChild(div);
+      if (type == 'error') div.style = 'background: red; padding: 10px;';
+      else {
+        if (type == 'warning') div.style = 'background: yellow; padding: 10px;';
+        setTimeout(function() {
+          warningBanner.removeChild(div);
+          updateBannerVisibility();
+        }, 5000);
+      }
+      updateBannerVisibility();
+    }
+
+    var buildUrl = "Build";
+    var loaderUrl = buildUrl + "/{{{ LOADER_FILENAME }}}";
+    var config = {
+      dataUrl: buildUrl + "/{{{ DATA_FILENAME }}}",
+      frameworkUrl: buildUrl + "/{{{ FRAMEWORK_FILENAME }}}",
+#if USE_THREADS
+      workerUrl: buildUrl + "/{{{ WORKER_FILENAME }}}",
+#endif
+#if USE_WASM
+      codeUrl: buildUrl + "/{{{ CODE_FILENAME }}}",
+#endif
+#if MEMORY_FILENAME
+      memoryUrl: buildUrl + "/{{{ MEMORY_FILENAME }}}",
+#endif
+#if SYMBOLS_FILENAME
+      symbolsUrl: buildUrl + "/{{{ SYMBOLS_FILENAME }}}",
+#endif
+      streamingAssetsUrl: "StreamingAssets",
+      companyName: "{{{ COMPANY_NAME }}}",
+      productName: "{{{ PRODUCT_NAME }}}",
+      productVersion: "{{{ PRODUCT_VERSION }}}",
+      showBanner: unityShowBanner,
+    };
+
+    // By default Unity keeps WebGL canvas render target size matched with
+    // the DOM size of the canvas element (scaled by window.devicePixelRatio)
+    // Set this to false if you want to decouple this synchronization from
+    // having to be done in the game loop (e.g. if you want to use the
+    // window.requestAnimationFrame to synchronize the game loop instead)
+    // config.matchWebGLToCanvasSize = false;
+
+    if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+      // Mobile device style: fill the whole browser client area with the game canvas:
+      var meta = document.createElement('meta');
+      meta.name = 'viewport';
+      meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
+      document.getElementsByTagName('head')[0].appendChild(meta);
+      container.className = "unity-mobile";
+      canvas.className = "unity-mobile";
+
+      // To lower canvas resolution on mobile devices to gain some
+      // temporary performance, uncomment the following line:
+      // config.devicePixelRatio = 1;
+    } else {
+      // Desktop style: Render the game canvas in a window that can be maximized to fullscreen:
+      canvas.style.width = "960px";
+      canvas.style.height = "600px";
+    }
+
+#if BACKGROUND_FILENAME
+    canvas.style.background = "url('" + buildUrl + "/{{{ BACKGROUND_FILENAME.replace(/'/g, '%27') }}}') center / cover";
+#endif
+    loadingBar.style.display = "block";
+
+    var script = document.createElement("script");
+    script.src = loaderUrl;
+    script.onload = () => {
+      createUnityInstance(canvas, config, (progress) => {
+        progressBarFull.style.width = 100 * progress + "%";
+      }).then((unityInstance) => {
+        loadingBar.style.display = "none";
+        fullscreenButton.onclick = () => {
+          unityInstance.SetFullscreen(1);
+        };
+        
+        // ============================================================
+        // Expose Unity instance globally for debugging (optional)
+        // ============================================================
+        window.unityInstance = unityInstance;
+        console.log("[MidnightTemplate] Unity instance ready");
+        console.log("[MidnightTemplate] MidnightCounter available:", typeof window.MidnightCounter !== "undefined");
+        
+      }).catch((message) => {
+        alert(message);
+      });
+    };
+    document.body.appendChild(script);
+  </script>
+</body>
+</html>

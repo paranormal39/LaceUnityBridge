@@ -1,0 +1,22 @@
+{
+  "name": "mesh-unity-bridge",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "build:copy": "node build.mjs && node scripts/copy-to-unity.js"
+  },
+  "dependencies": {
+    "@meshsdk/core": "^1.7.0",
+    "buffer": "^6.0.3",
+    "crypto-browserify": "^3.12.0",
+    "events": "^3.3.0",
+    "libsodium-sumo": "^0.7.13",
+    "libsodium-wrappers-sumo": "^0.7.13",
+    "stream-browserify": "^3.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.2",
+    "typescript": "^5.5.0"
+  }
+}
