@@ -70,7 +70,7 @@ public class MidnightUISetup : MonoBehaviour
         RectTransform panelRect = panelObj.GetComponent<RectTransform>();
         panelRect.anchorMin = new Vector2(0.5f, 0.5f);
         panelRect.anchorMax = new Vector2(0.5f, 0.5f);
-        panelRect.sizeDelta = new Vector2(550, 620);
+        panelRect.sizeDelta = new Vector2(550, 920);
         panelRect.anchoredPosition = Vector2.zero;
 
         // Create title
@@ -263,50 +263,94 @@ public class MidnightUISetup : MonoBehaviour
         sendBtnRect.anchoredPosition = new Vector2(0, -470);
         Button sendButton = sendBtnObj.GetComponent<Button>();
 
-        // === COUNTER SECTION ===
+        // === TAB BUTTONS ===
+        float tabY = -525f;
         
-        // Counter divider
-        GameObject counterDividerObj = CreatePanel(panelObj.transform, "CounterDivider", new Color(0.3f, 0.3f, 0.4f, 1f));
-        RectTransform counterDividerRect = counterDividerObj.GetComponent<RectTransform>();
-        counterDividerRect.anchorMin = new Vector2(0, 1);
-        counterDividerRect.anchorMax = new Vector2(1, 1);
-        counterDividerRect.pivot = new Vector2(0.5f, 1);
-        counterDividerRect.sizeDelta = new Vector2(-40, 2);
-        counterDividerRect.anchoredPosition = new Vector2(0, -525);
+        // Tab divider
+        GameObject tabDividerObj = CreatePanel(panelObj.transform, "TabDivider", new Color(0.3f, 0.3f, 0.4f, 1f));
+        RectTransform tabDividerRect = tabDividerObj.GetComponent<RectTransform>();
+        tabDividerRect.anchorMin = new Vector2(0, 1);
+        tabDividerRect.anchorMax = new Vector2(1, 1);
+        tabDividerRect.pivot = new Vector2(0.5f, 1);
+        tabDividerRect.sizeDelta = new Vector2(-40, 2);
+        tabDividerRect.anchoredPosition = new Vector2(0, tabY);
 
-        // Counter status text (shows above the value)
-        GameObject counterStatusObj = CreateText(panelObj.transform, "CounterStatusText", "Ready", 12, TextAnchor.MiddleCenter);
+        // Tab buttons row
+        GameObject tabRow = new GameObject("TabRow");
+        tabRow.transform.SetParent(panelObj.transform, false);
+        RectTransform tabRowRect = tabRow.AddComponent<RectTransform>();
+        tabRowRect.anchorMin = new Vector2(0.5f, 1);
+        tabRowRect.anchorMax = new Vector2(0.5f, 1);
+        tabRowRect.pivot = new Vector2(0.5f, 1);
+        tabRowRect.sizeDelta = new Vector2(340, 40);
+        tabRowRect.anchoredPosition = new Vector2(0, tabY - 5);
+
+        Color activeTabColor = new Color(0.3f, 0.5f, 0.9f, 1f);
+        Color inactiveTabColor = new Color(0.2f, 0.2f, 0.3f, 1f);
+
+        GameObject counterTabBtnObj = CreateButton(tabRow.transform, "CounterTabBtn", "Counter", activeTabColor);
+        RectTransform counterTabRect = counterTabBtnObj.GetComponent<RectTransform>();
+        counterTabRect.anchorMin = new Vector2(0, 0);
+        counterTabRect.anchorMax = new Vector2(0.48f, 1);
+        counterTabRect.offsetMin = Vector2.zero;
+        counterTabRect.offsetMax = Vector2.zero;
+        Button counterTabButton = counterTabBtnObj.GetComponent<Button>();
+        counterTabBtnObj.GetComponentInChildren<Text>().fontSize = 16;
+        Image counterTabImage = counterTabBtnObj.GetComponent<Image>();
+
+        GameObject daoTabBtnObj = CreateButton(tabRow.transform, "DaoTabBtn", "DAO", inactiveTabColor);
+        RectTransform daoTabRect = daoTabBtnObj.GetComponent<RectTransform>();
+        daoTabRect.anchorMin = new Vector2(0.52f, 0);
+        daoTabRect.anchorMax = new Vector2(1, 1);
+        daoTabRect.offsetMin = Vector2.zero;
+        daoTabRect.offsetMax = Vector2.zero;
+        Button daoTabButton = daoTabBtnObj.GetComponent<Button>();
+        daoTabBtnObj.GetComponentInChildren<Text>().fontSize = 16;
+        Image daoTabImage = daoTabBtnObj.GetComponent<Image>();
+
+        float contentY = tabY - 50f; // -575
+
+        // === COUNTER TAB CONTENT ===
+        GameObject counterTabContent = new GameObject("CounterTabContent");
+        counterTabContent.transform.SetParent(panelObj.transform, false);
+        RectTransform counterTabContentRect = counterTabContent.AddComponent<RectTransform>();
+        counterTabContentRect.anchorMin = new Vector2(0, 0);
+        counterTabContentRect.anchorMax = new Vector2(1, 1);
+        counterTabContentRect.offsetMin = Vector2.zero;
+        counterTabContentRect.offsetMax = Vector2.zero;
+
+        // Counter status text
+        GameObject counterStatusObj = CreateText(counterTabContent.transform, "CounterStatusText", "Ready", 12, TextAnchor.MiddleCenter);
         RectTransform counterStatusRect = counterStatusObj.GetComponent<RectTransform>();
         counterStatusRect.anchorMin = new Vector2(0, 1);
         counterStatusRect.anchorMax = new Vector2(1, 1);
         counterStatusRect.pivot = new Vector2(0.5f, 1);
         counterStatusRect.sizeDelta = new Vector2(0, 18);
-        counterStatusRect.anchoredPosition = new Vector2(0, -520);
+        counterStatusRect.anchoredPosition = new Vector2(0, contentY);
         Text counterStatusText = counterStatusObj.GetComponent<Text>();
         counterStatusText.color = new Color(0.6f, 0.6f, 0.7f, 1f);
 
         // Counter value text
-        GameObject counterValueObj = CreateText(panelObj.transform, "CounterText", "Counter: --", 24, TextAnchor.MiddleCenter);
+        GameObject counterValueObj = CreateText(counterTabContent.transform, "CounterText", "Counter: --", 24, TextAnchor.MiddleCenter);
         RectTransform counterValueRect = counterValueObj.GetComponent<RectTransform>();
         counterValueRect.anchorMin = new Vector2(0, 1);
         counterValueRect.anchorMax = new Vector2(1, 1);
         counterValueRect.pivot = new Vector2(0.5f, 1);
         counterValueRect.sizeDelta = new Vector2(0, 30);
-        counterValueRect.anchoredPosition = new Vector2(0, -535);
+        counterValueRect.anchoredPosition = new Vector2(0, contentY - 20);
         Text counterText = counterValueObj.GetComponent<Text>();
-        counterText.color = new Color(0.3f, 0.8f, 1f, 1f); // Cyan for counter
+        counterText.color = new Color(0.3f, 0.8f, 1f, 1f);
 
         // Counter buttons row
         GameObject counterButtonsRow = new GameObject("CounterButtonsRow");
-        counterButtonsRow.transform.SetParent(panelObj.transform, false);
+        counterButtonsRow.transform.SetParent(counterTabContent.transform, false);
         RectTransform counterButtonsRect = counterButtonsRow.AddComponent<RectTransform>();
         counterButtonsRect.anchorMin = new Vector2(0.5f, 1);
         counterButtonsRect.anchorMax = new Vector2(0.5f, 1);
         counterButtonsRect.pivot = new Vector2(0.5f, 1);
         counterButtonsRect.sizeDelta = new Vector2(340, 35);
-        counterButtonsRect.anchoredPosition = new Vector2(0, -570);
+        counterButtonsRect.anchoredPosition = new Vector2(0, contentY - 55);
 
-        // Refresh Counter button (left)
         GameObject refreshCounterBtnObj = CreateButton(counterButtonsRow.transform, "RefreshCounterButton", "Refresh", new Color(0.2f, 0.5f, 0.7f, 1f));
         RectTransform refreshCounterBtnRect = refreshCounterBtnObj.GetComponent<RectTransform>();
         refreshCounterBtnRect.anchorMin = new Vector2(0, 0);
@@ -316,7 +360,6 @@ public class MidnightUISetup : MonoBehaviour
         Button refreshCounterButton = refreshCounterBtnObj.GetComponent<Button>();
         refreshCounterBtnObj.GetComponentInChildren<Text>().fontSize = 14;
 
-        // Increment Counter button (right)
         GameObject incrementCounterBtnObj = CreateButton(counterButtonsRow.transform, "IncrementCounterButton", "Increment (+1)", new Color(0.6f, 0.3f, 0.7f, 1f));
         RectTransform incrementCounterBtnRect = incrementCounterBtnObj.GetComponent<RectTransform>();
         incrementCounterBtnRect.anchorMin = new Vector2(0.52f, 0);
@@ -325,6 +368,179 @@ public class MidnightUISetup : MonoBehaviour
         incrementCounterBtnRect.offsetMax = Vector2.zero;
         Button incrementCounterButton = incrementCounterBtnObj.GetComponent<Button>();
         incrementCounterBtnObj.GetComponentInChildren<Text>().fontSize = 14;
+
+        // === DAO TAB CONTENT ===
+        GameObject daoTabContent = new GameObject("DaoTabContent");
+        daoTabContent.transform.SetParent(panelObj.transform, false);
+        RectTransform daoTabContentRect = daoTabContent.AddComponent<RectTransform>();
+        daoTabContentRect.anchorMin = new Vector2(0, 0);
+        daoTabContentRect.anchorMax = new Vector2(1, 1);
+        daoTabContentRect.offsetMin = Vector2.zero;
+        daoTabContentRect.offsetMax = Vector2.zero;
+        daoTabContent.SetActive(false); // Start hidden
+
+        float dy = contentY; // starting Y offset for DAO content
+
+        // Proposals list area
+        GameObject proposalsObj = CreateText(daoTabContent.transform, "ProposalsText", "Click 'Refresh' to load proposals...", 12, TextAnchor.UpperLeft);
+        RectTransform proposalsRect = proposalsObj.GetComponent<RectTransform>();
+        proposalsRect.anchorMin = new Vector2(0, 1);
+        proposalsRect.anchorMax = new Vector2(1, 1);
+        proposalsRect.pivot = new Vector2(0.5f, 1);
+        proposalsRect.sizeDelta = new Vector2(-40, 70);
+        proposalsRect.anchoredPosition = new Vector2(0, dy);
+        Text proposalsText = proposalsObj.GetComponent<Text>();
+        proposalsText.color = new Color(0.8f, 0.8f, 0.9f, 1f);
+        dy -= 72;
+
+        // Refresh proposals button
+        GameObject refreshDaoBtnObj = CreateButton(daoTabContent.transform, "RefreshDaoBtn", "Refresh Proposals", new Color(0.2f, 0.5f, 0.7f, 1f));
+        RectTransform refreshDaoBtnRect = refreshDaoBtnObj.GetComponent<RectTransform>();
+        refreshDaoBtnRect.anchorMin = new Vector2(0.5f, 1);
+        refreshDaoBtnRect.anchorMax = new Vector2(0.5f, 1);
+        refreshDaoBtnRect.pivot = new Vector2(0.5f, 1);
+        refreshDaoBtnRect.sizeDelta = new Vector2(180, 28);
+        refreshDaoBtnRect.anchoredPosition = new Vector2(0, dy);
+        Button refreshDaoButton = refreshDaoBtnObj.GetComponent<Button>();
+        refreshDaoBtnObj.GetComponentInChildren<Text>().fontSize = 12;
+        dy -= 32;
+
+        // --- Proposal selector: [<] "#0 Title (Y:1 N:0 A:0)" [>] ---
+        GameObject selectorRow = new GameObject("SelectorRow");
+        selectorRow.transform.SetParent(daoTabContent.transform, false);
+        RectTransform selectorRowRect = selectorRow.AddComponent<RectTransform>();
+        selectorRowRect.anchorMin = new Vector2(0.5f, 1);
+        selectorRowRect.anchorMax = new Vector2(0.5f, 1);
+        selectorRowRect.pivot = new Vector2(0.5f, 1);
+        selectorRowRect.sizeDelta = new Vector2(480, 30);
+        selectorRowRect.anchoredPosition = new Vector2(0, dy);
+
+        GameObject prevBtnObj = CreateButton(selectorRow.transform, "PrevBtn", "<", new Color(0.3f, 0.3f, 0.45f, 1f));
+        RectTransform prevBtnRect = prevBtnObj.GetComponent<RectTransform>();
+        prevBtnRect.anchorMin = new Vector2(0, 0); prevBtnRect.anchorMax = new Vector2(0.08f, 1);
+        prevBtnRect.offsetMin = Vector2.zero; prevBtnRect.offsetMax = Vector2.zero;
+        Button prevButton = prevBtnObj.GetComponent<Button>();
+        prevBtnObj.GetComponentInChildren<Text>().fontSize = 16;
+
+        GameObject selectedLabelObj = CreateText(selectorRow.transform, "SelectedLabel", "No proposals loaded", 13, TextAnchor.MiddleCenter);
+        RectTransform selectedLabelRect = selectedLabelObj.GetComponent<RectTransform>();
+        selectedLabelRect.anchorMin = new Vector2(0.1f, 0); selectedLabelRect.anchorMax = new Vector2(0.9f, 1);
+        selectedLabelRect.offsetMin = Vector2.zero; selectedLabelRect.offsetMax = Vector2.zero;
+        Text selectedLabelText = selectedLabelObj.GetComponent<Text>();
+        selectedLabelText.color = new Color(0.3f, 0.8f, 1f, 1f);
+
+        GameObject nextBtnObj = CreateButton(selectorRow.transform, "NextBtn", ">", new Color(0.3f, 0.3f, 0.45f, 1f));
+        RectTransform nextBtnRect = nextBtnObj.GetComponent<RectTransform>();
+        nextBtnRect.anchorMin = new Vector2(0.92f, 0); nextBtnRect.anchorMax = new Vector2(1, 1);
+        nextBtnRect.offsetMin = Vector2.zero; nextBtnRect.offsetMax = Vector2.zero;
+        Button nextButton = nextBtnObj.GetComponent<Button>();
+        nextBtnObj.GetComponentInChildren<Text>().fontSize = 16;
+        dy -= 34;
+
+        // Vote buttons row
+        GameObject voteRow = new GameObject("VoteRow");
+        voteRow.transform.SetParent(daoTabContent.transform, false);
+        RectTransform voteRowRect = voteRow.AddComponent<RectTransform>();
+        voteRowRect.anchorMin = new Vector2(0.5f, 1);
+        voteRowRect.anchorMax = new Vector2(0.5f, 1);
+        voteRowRect.pivot = new Vector2(0.5f, 1);
+        voteRowRect.sizeDelta = new Vector2(380, 32);
+        voteRowRect.anchoredPosition = new Vector2(0, dy);
+
+        GameObject yesBtn = CreateButton(voteRow.transform, "YesBtn", "Vote Yes", new Color(0.2f, 0.7f, 0.3f, 1f));
+        RectTransform yesBtnRect = yesBtn.GetComponent<RectTransform>();
+        yesBtnRect.anchorMin = new Vector2(0, 0); yesBtnRect.anchorMax = new Vector2(0.32f, 1);
+        yesBtnRect.offsetMin = Vector2.zero; yesBtnRect.offsetMax = Vector2.zero;
+        Button yesButton = yesBtn.GetComponent<Button>();
+        yesBtn.GetComponentInChildren<Text>().fontSize = 13;
+
+        GameObject noBtn = CreateButton(voteRow.transform, "NoBtn", "Vote No", new Color(0.8f, 0.2f, 0.2f, 1f));
+        RectTransform noBtnRect = noBtn.GetComponent<RectTransform>();
+        noBtnRect.anchorMin = new Vector2(0.34f, 0); noBtnRect.anchorMax = new Vector2(0.66f, 1);
+        noBtnRect.offsetMin = Vector2.zero; noBtnRect.offsetMax = Vector2.zero;
+        Button noButton = noBtn.GetComponent<Button>();
+        noBtn.GetComponentInChildren<Text>().fontSize = 13;
+
+        GameObject appealBtn = CreateButton(voteRow.transform, "AppealBtn", "Appeal", new Color(0.8f, 0.6f, 0.1f, 1f));
+        RectTransform appealBtnRect = appealBtn.GetComponent<RectTransform>();
+        appealBtnRect.anchorMin = new Vector2(0.68f, 0); appealBtnRect.anchorMax = new Vector2(1, 1);
+        appealBtnRect.offsetMin = Vector2.zero; appealBtnRect.offsetMax = Vector2.zero;
+        Button appealButton = appealBtn.GetComponent<Button>();
+        appealBtn.GetComponentInChildren<Text>().fontSize = 13;
+        dy -= 36;
+
+        // DAO status text
+        GameObject daoStatusObj = CreateText(daoTabContent.transform, "DaoStatusText", "", 11, TextAnchor.MiddleCenter);
+        RectTransform daoStatusRect = daoStatusObj.GetComponent<RectTransform>();
+        daoStatusRect.anchorMin = new Vector2(0, 1);
+        daoStatusRect.anchorMax = new Vector2(1, 1);
+        daoStatusRect.pivot = new Vector2(0.5f, 1);
+        daoStatusRect.sizeDelta = new Vector2(-40, 18);
+        daoStatusRect.anchoredPosition = new Vector2(0, dy);
+        Text daoStatusText = daoStatusObj.GetComponent<Text>();
+        daoStatusText.color = new Color(1f, 0.8f, 0.3f, 1f);
+        dy -= 22;
+
+        // --- Create Proposal section ---
+        GameObject createDivObj = CreatePanel(daoTabContent.transform, "CreateDivider", new Color(0.3f, 0.3f, 0.4f, 1f));
+        RectTransform createDivRect = createDivObj.GetComponent<RectTransform>();
+        createDivRect.anchorMin = new Vector2(0, 1); createDivRect.anchorMax = new Vector2(1, 1);
+        createDivRect.pivot = new Vector2(0.5f, 1);
+        createDivRect.sizeDelta = new Vector2(-40, 1);
+        createDivRect.anchoredPosition = new Vector2(0, dy);
+        dy -= 4;
+
+        GameObject createLabelObj = CreateText(daoTabContent.transform, "CreateLabel", "Create Proposal", 15, TextAnchor.MiddleCenter);
+        RectTransform createLabelRect = createLabelObj.GetComponent<RectTransform>();
+        createLabelRect.anchorMin = new Vector2(0, 1); createLabelRect.anchorMax = new Vector2(1, 1);
+        createLabelRect.pivot = new Vector2(0.5f, 1);
+        createLabelRect.sizeDelta = new Vector2(0, 22);
+        createLabelRect.anchoredPosition = new Vector2(0, dy);
+        dy -= 24;
+
+        // Title input
+        GameObject proposalTitleInput = CreateInputField(daoTabContent.transform, "ProposalTitleInput", "Proposal title...");
+        RectTransform ptRect = proposalTitleInput.GetComponent<RectTransform>();
+        ptRect.anchorMin = new Vector2(0, 1); ptRect.anchorMax = new Vector2(1, 1);
+        ptRect.pivot = new Vector2(0.5f, 1);
+        ptRect.sizeDelta = new Vector2(-40, 28);
+        ptRect.anchoredPosition = new Vector2(0, dy);
+        InputField proposalTitleField = proposalTitleInput.GetComponent<InputField>();
+        dy -= 32;
+
+        // Description input
+        GameObject proposalDescInput = CreateInputField(daoTabContent.transform, "ProposalDescInput", "Description...");
+        RectTransform pdRect = proposalDescInput.GetComponent<RectTransform>();
+        pdRect.anchorMin = new Vector2(0, 1); pdRect.anchorMax = new Vector2(1, 1);
+        pdRect.pivot = new Vector2(0.5f, 1);
+        pdRect.sizeDelta = new Vector2(-40, 28);
+        pdRect.anchoredPosition = new Vector2(0, dy);
+        InputField proposalDescField = proposalDescInput.GetComponent<InputField>();
+        dy -= 32;
+
+        // Create button
+        GameObject createBtnObj = CreateButton(daoTabContent.transform, "CreateProposalBtn", "Create (2 ADA)", new Color(0.6f, 0.3f, 0.7f, 1f));
+        RectTransform createBtnRect = createBtnObj.GetComponent<RectTransform>();
+        createBtnRect.anchorMin = new Vector2(0.5f, 1); createBtnRect.anchorMax = new Vector2(0.5f, 1);
+        createBtnRect.pivot = new Vector2(0.5f, 1);
+        createBtnRect.sizeDelta = new Vector2(180, 32);
+        createBtnRect.anchoredPosition = new Vector2(0, dy);
+        Button createProposalButton = createBtnObj.GetComponent<Button>();
+        createBtnObj.GetComponentInChildren<Text>().fontSize = 13;
+
+        // === TAB SWITCHING LOGIC ===
+        counterTabButton.onClick.AddListener(() => {
+            counterTabContent.SetActive(true);
+            daoTabContent.SetActive(false);
+            counterTabImage.color = activeTabColor;
+            daoTabImage.color = inactiveTabColor;
+        });
+        daoTabButton.onClick.AddListener(() => {
+            counterTabContent.SetActive(false);
+            daoTabContent.SetActive(true);
+            counterTabImage.color = inactiveTabColor;
+            daoTabImage.color = activeTabColor;
+        });
 
         // Create MidnightBridge and wire up references
         GameObject bridgeObj = new GameObject("MidnightBridge");
@@ -397,7 +613,150 @@ public class MidnightUISetup : MonoBehaviour
         // doesn't expose a connection event directly from UI setup
         StartCoroutine(EnableIncrementButtonWhenConnected(bridge, incrementBtn));
 
-        Debug.Log("[MidnightUISetup] UI created successfully");
+        // === DAO WIRING ===
+        Cardano.CardanoBridge.DaoProposal[] currentProposals = null;
+        int selectedProposalIndex = 0;
+
+        // Helper to update the selector label
+        System.Action updateSelectorLabel = () => {
+            if (currentProposals == null || currentProposals.Length == 0)
+            {
+                selectedLabelText.text = "No proposals loaded";
+                selectedLabelText.color = new Color(0.5f, 0.5f, 0.6f, 1f);
+                return;
+            }
+            var sp = currentProposals[selectedProposalIndex];
+            selectedLabelText.text = $"#{selectedProposalIndex}/{currentProposals.Length - 1}  {sp.title}  (Y:{sp.yesCount} N:{sp.noCount} A:{sp.appealCount})";
+            selectedLabelText.color = new Color(0.3f, 0.8f, 1f, 1f);
+        };
+
+        // Prev/Next buttons
+        prevButton.onClick.AddListener(() => {
+            if (currentProposals == null || currentProposals.Length == 0) return;
+            selectedProposalIndex = (selectedProposalIndex - 1 + currentProposals.Length) % currentProposals.Length;
+            updateSelectorLabel();
+        });
+        nextButton.onClick.AddListener(() => {
+            if (currentProposals == null || currentProposals.Length == 0) return;
+            selectedProposalIndex = (selectedProposalIndex + 1) % currentProposals.Length;
+            updateSelectorLabel();
+        });
+
+        // Create CardanoBridge if it doesn't exist
+        if (Cardano.CardanoBridge.Instance == null)
+        {
+            GameObject cardanoBridgeObj = new GameObject("CardanoBridge");
+            cardanoBridgeObj.AddComponent<Cardano.CardanoBridge>();
+        }
+
+        // Pass Blockfrost key to CardanoBridge for DAO operations
+        if (!string.IsNullOrEmpty(blockfrostProjectId))
+        {
+            Cardano.CardanoBridge.Instance.SetBlockfrostKey(blockfrostProjectId);
+        }
+
+        // Refresh proposals
+        refreshDaoButton.onClick.AddListener(() => {
+            daoStatusText.text = "Loading proposals...";
+            daoStatusText.color = new Color(1f, 0.8f, 0.3f, 1f);
+            Cardano.CardanoBridge.Instance.FetchDaoProposals();
+        });
+
+        // Handle proposals received
+        Cardano.CardanoBridge.Instance.OnDaoProposalsReceived += (proposals) => {
+            currentProposals = proposals;
+            if (proposals == null || proposals.Length == 0)
+            {
+                proposalsText.text = "No proposals found.";
+                selectedProposalIndex = 0;
+                updateSelectorLabel();
+                daoStatusText.text = "";
+                return;
+            }
+            string display = "";
+            for (int idx = 0; idx < proposals.Length; idx++)
+            {
+                var p = proposals[idx];
+                display += $"#{idx} {p.title}  (Y:{p.yesCount} N:{p.noCount} A:{p.appealCount})\n";
+            }
+            proposalsText.text = display;
+            if (selectedProposalIndex >= proposals.Length) selectedProposalIndex = 0;
+            updateSelectorLabel();
+            daoStatusText.text = proposals.Length + " proposal(s) loaded";
+            daoStatusText.color = new Color(0.4f, 0.9f, 0.4f, 1f);
+        };
+        Cardano.CardanoBridge.Instance.OnDaoProposalsFailed += (err) => {
+            daoStatusText.text = "Error: " + err;
+            daoStatusText.color = new Color(1f, 0.3f, 0.3f, 1f);
+        };
+
+        // Vote buttons — use selectedProposalIndex
+        yesButton.onClick.AddListener(() => {
+            if (currentProposals == null || currentProposals.Length == 0) { daoStatusText.text = "No proposals loaded"; return; }
+            var p = currentProposals[selectedProposalIndex];
+            daoStatusText.text = $"Voting YES on #{selectedProposalIndex} '{p.title}'...";
+            daoStatusText.color = new Color(1f, 0.8f, 0.3f, 1f);
+            Cardano.CardanoBridge.Instance.VoteOnDaoProposal(p.txHash, p.txIndex, "yes");
+        });
+        noButton.onClick.AddListener(() => {
+            if (currentProposals == null || currentProposals.Length == 0) { daoStatusText.text = "No proposals loaded"; return; }
+            var p = currentProposals[selectedProposalIndex];
+            daoStatusText.text = $"Voting NO on #{selectedProposalIndex} '{p.title}'...";
+            daoStatusText.color = new Color(1f, 0.8f, 0.3f, 1f);
+            Cardano.CardanoBridge.Instance.VoteOnDaoProposal(p.txHash, p.txIndex, "no");
+        });
+        appealButton.onClick.AddListener(() => {
+            if (currentProposals == null || currentProposals.Length == 0) { daoStatusText.text = "No proposals loaded"; return; }
+            var p = currentProposals[selectedProposalIndex];
+            daoStatusText.text = $"Voting APPEAL on #{selectedProposalIndex} '{p.title}'...";
+            daoStatusText.color = new Color(1f, 0.8f, 0.3f, 1f);
+            Cardano.CardanoBridge.Instance.VoteOnDaoProposal(p.txHash, p.txIndex, "appeal");
+        });
+
+        // Vote result handlers
+        Cardano.CardanoBridge.Instance.OnDaoVoteSuccess += (txHash) => {
+            daoStatusText.text = "Vote submitted! Tx: " + txHash.Substring(0, 16) + "...";
+            daoStatusText.color = new Color(0.4f, 0.9f, 0.4f, 1f);
+            StartCoroutine(DelayedDaoRefresh(20f));
+        };
+        Cardano.CardanoBridge.Instance.OnDaoVoteFailed += (err) => {
+            daoStatusText.text = "Vote failed: " + err;
+            daoStatusText.color = new Color(1f, 0.3f, 0.3f, 1f);
+        };
+
+        // Create proposal
+        createProposalButton.onClick.AddListener(() => {
+            string t = proposalTitleField.text;
+            string d = proposalDescField.text;
+            if (string.IsNullOrEmpty(t)) { daoStatusText.text = "Enter a title"; return; }
+            daoStatusText.text = "Creating proposal...";
+            daoStatusText.color = new Color(1f, 0.8f, 0.3f, 1f);
+            Cardano.CardanoBridge.Instance.CreateDaoProposal("unity-dao-v1", t, d);
+        });
+        Cardano.CardanoBridge.Instance.OnDaoProposalCreated += (txHash) => {
+            daoStatusText.text = "Proposal created! Tx: " + txHash.Substring(0, 16) + "...";
+            daoStatusText.color = new Color(0.4f, 0.9f, 0.4f, 1f);
+            proposalTitleField.text = "";
+            proposalDescField.text = "";
+            StartCoroutine(DelayedDaoRefresh(20f));
+        };
+        Cardano.CardanoBridge.Instance.OnDaoProposalCreateFailed += (err) => {
+            daoStatusText.text = "Create failed: " + err;
+            daoStatusText.color = new Color(1f, 0.3f, 0.3f, 1f);
+        };
+
+        // Disable DAO buttons until wallet connected
+        yesButton.interactable = false;
+        noButton.interactable = false;
+        appealButton.interactable = false;
+        createProposalButton.interactable = false;
+        proposalTitleField.interactable = false;
+        proposalDescField.interactable = false;
+
+        // Enable DAO buttons when wallet connects
+        StartCoroutine(EnableDaoButtonsWhenConnected(bridge, new Button[] { yesButton, noButton, appealButton, createProposalButton }, new InputField[] { proposalTitleField, proposalDescField }));
+
+        Debug.Log("[MidnightUISetup] UI created successfully (with Counter + DAO tabs)");
     }
 
     private GameObject CreateInputField(Transform parent, string name, string placeholder)
@@ -551,6 +910,57 @@ public class MidnightUISetup : MonoBehaviour
             if (incrementButton != null)
             {
                 incrementButton.interactable = bridge.IsConnectedToWallet;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Coroutine to refresh DAO proposals after a delay (for block confirmation).
+    /// </summary>
+    private IEnumerator DelayedDaoRefresh(float delaySeconds)
+    {
+        Debug.Log($"[MidnightUISetup] Waiting {delaySeconds}s for block confirmation before DAO refresh...");
+        yield return new WaitForSeconds(delaySeconds);
+        
+        if (Cardano.CardanoBridge.Instance != null)
+        {
+            Debug.Log("[MidnightUISetup] Auto-refreshing DAO proposals");
+            Cardano.CardanoBridge.Instance.FetchDaoProposals();
+        }
+    }
+
+    /// <summary>
+    /// Coroutine to enable DAO buttons when wallet connects.
+    /// </summary>
+    private IEnumerator EnableDaoButtonsWhenConnected(MidnightBridge bridge, Button[] buttons, InputField[] inputs)
+    {
+        while (bridge != null && !bridge.IsConnectedToWallet)
+        {
+            yield return new WaitForSeconds(1f);
+        }
+        
+        foreach (var btn in buttons)
+        {
+            if (btn != null) btn.interactable = true;
+        }
+        foreach (var input in inputs)
+        {
+            if (input != null) input.interactable = true;
+        }
+        Debug.Log("[MidnightUISetup] DAO buttons enabled (wallet connected)");
+        
+        // Continue monitoring for disconnection
+        while (bridge != null)
+        {
+            yield return new WaitForSeconds(1f);
+            bool connected = bridge.IsConnectedToWallet;
+            foreach (var btn in buttons)
+            {
+                if (btn != null) btn.interactable = connected;
+            }
+            foreach (var input in inputs)
+            {
+                if (input != null) input.interactable = connected;
             }
         }
     }

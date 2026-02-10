@@ -154,7 +154,7 @@ MonoBehaviour:
   buttonColor: {r: 0.3, g: 0.5, b: 0.9, a: 1}
   textColor: {r: 1, g: 1, b: 1, a: 1}
   addressColor: {r: 0.5, g: 0.8, b: 0.5, a: 1}
-  blockfrostProjectId: preprodruZRJ7BGApDb0YiQI9QeWB0LIF2UFpWi
+  blockfrostProjectId: 
   counterScriptAddress: addr_test1wq0666pyk48q4v2zgjgdd4fuzn3xg2lzhsvueduvjxjuksqc7yh2n
 --- !u!4 &77720041
 Transform:

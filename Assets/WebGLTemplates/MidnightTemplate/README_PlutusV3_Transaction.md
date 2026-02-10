@@ -403,7 +403,7 @@ const SCRIPT_HASH    = "1fad6824b54e0ab1424490d6d53c14e2642be2bc19ccb78c91a5cb40
 
 // Blockfrost
 const BLOCKFROST_URL = "https://cardano-preprod.blockfrost.io/api/v0";
-const BLOCKFROST_KEY = "preprodruZRJ7BGApDb0YiQI9QeWB0LIF2UFpWi";
+const BLOCKFROST_KEY = "YOUR_BLOCKFROST_PROJECT_ID"; // Get from https://blockfrost.io
 
 // Redeemer (Increment action)
 const REDEEMER_CBOR = "d87980";  // Constr 0 []

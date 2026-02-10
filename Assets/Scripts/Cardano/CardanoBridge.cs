@@ -23,6 +23,14 @@ namespace Cardano
         public event Action<TransactionResult> OnTransactionSuccess;
         public event Action<string> OnTransactionFailed;
 
+        // DAO Events
+        public event Action<DaoProposal[]> OnDaoProposalsReceived;
+        public event Action<string> OnDaoProposalsFailed;
+        public event Action<string> OnDaoProposalCreated;
+        public event Action<string> OnDaoProposalCreateFailed;
+        public event Action<string> OnDaoVoteSuccess;
+        public event Action<string> OnDaoVoteFailed;
+
         // State
         public bool IsConnected => CardanoBridge_IsConnected() == 1;
         public bool IsLaceAvailable => CardanoBridge_IsLaceAvailable() == 1;
@@ -59,6 +67,15 @@ namespace Cardano
 
         [DllImport("__Internal")]
         private static extern void CardanoBridge_GetChangeAddress(string gameObjectName, string successCallback, string errorCallback);
+
+        [DllImport("__Internal")]
+        private static extern void CardanoBridge_FetchDaoProposals(string gameObjectName, string successCallback, string errorCallback, string blockfrostKey);
+
+        [DllImport("__Internal")]
+        private static extern void CardanoBridge_CreateDaoProposal(string gameObjectName, string successCallback, string errorCallback, string blockfrostKey, string policyId, string title, string description);
+
+        [DllImport("__Internal")]
+        private static extern void CardanoBridge_VoteOnDaoProposal(string gameObjectName, string successCallback, string errorCallback, string blockfrostKey, string proposalTxHash, int proposalTxIndex, string voteType);
 #else
         // Editor stubs
         private static int CardanoBridge_IsLaceAvailable() => 0;
@@ -71,6 +88,9 @@ namespace Cardano
         private static void CardanoBridge_GetUtxos(string a, string b, string c) { Debug.Log("[CardanoBridge] Editor: GetUtxos stub"); }
         private static void CardanoBridge_BuildAndSendPayment(string a, string b, string c, string d, string e) { Debug.Log("[CardanoBridge] Editor: BuildAndSendPayment stub"); }
         private static void CardanoBridge_GetChangeAddress(string a, string b, string c) { Debug.Log("[CardanoBridge] Editor: GetChangeAddress stub"); }
+        private static void CardanoBridge_FetchDaoProposals(string a, string b, string c, string d) { Debug.Log("[CardanoBridge] Editor: FetchDaoProposals stub"); }
+        private static void CardanoBridge_CreateDaoProposal(string a, string b, string c, string d, string e, string f, string g) { Debug.Log("[CardanoBridge] Editor: CreateDaoProposal stub"); }
+        private static void CardanoBridge_VoteOnDaoProposal(string a, string b, string c, string d, string e, int f, string g) { Debug.Log("[CardanoBridge] Editor: VoteOnDaoProposal stub"); }
 #endif
 
         #endregion
@@ -153,6 +173,48 @@ namespace Cardano
         {
             long lovelace = (long)(adaAmount * 1_000_000m);
             SendPayment(toAddress, lovelace);
+        }
+
+        // DAO Blockfrost key — set at runtime via SetBlockfrostKey()
+        private string _daoBlockfrostKey = "";
+
+        /// <summary>
+        /// Set the Blockfrost API key for DAO operations.
+        /// Called from MidnightUISetup using the inspector-configured value.
+        /// </summary>
+        public void SetBlockfrostKey(string key)
+        {
+            _daoBlockfrostKey = key;
+        }
+
+        /// <summary>
+        /// Fetch all DAO proposals from the script address
+        /// </summary>
+        public void FetchDaoProposals()
+        {
+            Debug.Log("[CardanoBridge] Fetching DAO proposals...");
+            CardanoBridge_FetchDaoProposals(gameObject.name, "OnDaoProposalsSuccess", "OnDaoProposalsError", _daoBlockfrostKey);
+        }
+
+        /// <summary>
+        /// Create a new DAO proposal (sends 2 ADA to script address with inline datum)
+        /// </summary>
+        public void CreateDaoProposal(string policyId, string title, string description)
+        {
+            Debug.Log($"[CardanoBridge] Creating DAO proposal: {title}");
+            CardanoBridge_CreateDaoProposal(gameObject.name, "OnDaoCreateSuccess", "OnDaoCreateError", _daoBlockfrostKey, policyId, title, description);
+        }
+
+        /// <summary>
+        /// Vote on a DAO proposal (spends script UTxO with vote redeemer)
+        /// </summary>
+        /// <param name="proposalTxHash">The tx hash of the proposal UTxO</param>
+        /// <param name="proposalTxIndex">The output index of the proposal UTxO</param>
+        /// <param name="voteType">"yes", "no", or "appeal"</param>
+        public void VoteOnDaoProposal(string proposalTxHash, int proposalTxIndex, string voteType)
+        {
+            Debug.Log($"[CardanoBridge] Voting {voteType} on {proposalTxHash}#{proposalTxIndex}");
+            CardanoBridge_VoteOnDaoProposal(gameObject.name, "OnDaoVoteSuccessCb", "OnDaoVoteErrorCb", _daoBlockfrostKey, proposalTxHash, proposalTxIndex, voteType);
         }
 
         #endregion
@@ -250,6 +312,52 @@ namespace Cardano
             return json.Substring(start, end - start);
         }
 
+        // DAO Callbacks
+        private void OnDaoProposalsSuccess(string json)
+        {
+            Debug.Log($"[CardanoBridge] DAO proposals received: {json}");
+            try
+            {
+                var proposals = JsonHelper.FromJsonArray<DaoProposal>(json);
+                OnDaoProposalsReceived?.Invoke(proposals);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[CardanoBridge] Failed to parse proposals: {e.Message}");
+                OnDaoProposalsFailed?.Invoke("Failed to parse proposals");
+            }
+        }
+
+        private void OnDaoProposalsError(string error)
+        {
+            Debug.LogError($"[CardanoBridge] DAO proposals failed: {error}");
+            OnDaoProposalsFailed?.Invoke(error);
+        }
+
+        private void OnDaoCreateSuccess(string txHash)
+        {
+            Debug.Log($"[CardanoBridge] DAO proposal created: {txHash}");
+            OnDaoProposalCreated?.Invoke(txHash);
+        }
+
+        private void OnDaoCreateError(string error)
+        {
+            Debug.LogError($"[CardanoBridge] DAO proposal creation failed: {error}");
+            OnDaoProposalCreateFailed?.Invoke(error);
+        }
+
+        private void OnDaoVoteSuccessCb(string txHash)
+        {
+            Debug.Log($"[CardanoBridge] DAO vote success: {txHash}");
+            OnDaoVoteSuccess?.Invoke(txHash);
+        }
+
+        private void OnDaoVoteErrorCb(string error)
+        {
+            Debug.LogError($"[CardanoBridge] DAO vote failed: {error}");
+            OnDaoVoteFailed?.Invoke(error);
+        }
+
         #endregion
 
         #region Data Classes
@@ -269,6 +377,20 @@ namespace Cardano
         public class TransactionResult
         {
             public string txHash;
+        }
+
+        [Serializable]
+        public class DaoProposal
+        {
+            public string policyId;
+            public string title;
+            public string description;
+            public int yesCount;
+            public int noCount;
+            public int appealCount;
+            public string txHash;
+            public int txIndex;
+            public string lovelace;
         }
 
         // Helper for JSON array parsing

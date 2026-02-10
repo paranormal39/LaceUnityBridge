@@ -209,12 +209,24 @@ The `IncrementCounterCSL` function in `increment-counter-csl.js` handles:
 - **Safari:** ⚠️ May have WebAssembly issues
 - **Mobile:** ❌ Wallet extensions not available
 
+## Blockfrost API Key Setup
+
+Both the counter dApp and DAO features require a **Blockfrost API key** for Preprod.
+
+1. Go to [https://blockfrost.io](https://blockfrost.io) and create a free account
+2. Create a new project for **Cardano Preprod**
+3. Copy the **Project ID** (starts with `preprod...`)
+4. In Unity, select the `MidnightUISetup` GameObject and paste the key into the **Blockfrost Project Id** field in the Inspector
+
+> **⚠️ Never commit your API key to version control.** The scene file ships with an empty key. Each developer must set their own in the Unity Inspector.
+
 ## Security Notes
 
-1. **Never hardcode private keys** - All signing happens in the wallet
-2. **Validate addresses** - Check address format before sending
-3. **User gesture required** - `connectWallet()` must be called from button click
-4. **HTTPS required** - CIP-30 wallets require secure context
+1. **Never hardcode API keys** - Set them via the Unity Inspector at development time
+2. **Never hardcode private keys** - All signing happens in the wallet
+3. **Validate addresses** - Check address format before sending
+4. **User gesture required** - `connectWallet()` must be called from button click
+5. **HTTPS required** - CIP-30 wallets require secure context
 
 ## Debugging
 
@@ -268,20 +280,30 @@ await CardanoBridge.getBalance()
 - **Confirmed on-chain:** `484b2f6a612c8d2a94cf122dde4d4f194bb5310f068103b5423bc877332c2186`
 - Full technical docs: `Assets/WebGLTemplates/MidnightTemplate/README_PlutusV3_Transaction.md`
 
-### Milestone 3 — Midnight Network Integration 🔜
+### Milestone 3 — On-Chain DAO Governance ✅
+
+- **DAO smart contract** (Plutus V3) deployed on Preprod
+- Create proposals with inline datum (policy ID, title, description, vote counts)
+- Vote on proposals (Yes / No / Appeal) — spends and recreates script UTxO with updated datum
+- Proposal browser with prev/next navigation in Unity UI
+- Blockfrost-based script CBOR fetching and auto-detection of Plutus version
+- Full transaction flow: build → evaluate → sign → submit
+- **DAO Script Address:** `addr_test1wzgxsphtczfamr2cljp80e48544vwp3p4u9n68702t6psgcnkt88j`
+
+### Milestone 4 — Midnight Network Integration 🔜
 
 - Connect to Midnight network via Lace's Midnight DApp connector
 - Interact with Midnight smart contracts (Compact language)
 - Shielded address support and tDUST/tNIGHT token workflows
 - Bridge between Cardano and Midnight state
 
-### Milestone 4 — Counter Smart Contract on Midnight 🔜
+### Milestone 5 — Counter Smart Contract on Midnight 🔜
 
 - Deploy the counter contract on Midnight using Compact
 - Read/write shielded state from Unity
 - Compare Cardano Plutus V3 vs Midnight Compact developer experience
 
-### Milestone 5 — Expanded Cardano System 🔜
+### Milestone 6 — Expanded Cardano System 🔜
 
 - Multi-asset (native token) support
 - Proper coin selection algorithms (random-improve, largest-first)

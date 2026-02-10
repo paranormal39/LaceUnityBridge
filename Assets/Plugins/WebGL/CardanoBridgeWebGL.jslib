@@ -180,6 +180,88 @@ mergeInto(LibraryManager.library, {
   },
 
   // ============================================================
+  // CardanoBridge_FetchDaoProposals
+  // ============================================================
+  CardanoBridge_FetchDaoProposals: function(gameObjectNamePtr, successCallbackPtr, errorCallbackPtr, blockfrostKeyPtr) {
+    var gameObjectName = UTF8ToString(gameObjectNamePtr);
+    var successCallback = UTF8ToString(successCallbackPtr);
+    var errorCallback = UTF8ToString(errorCallbackPtr);
+    var blockfrostKey = UTF8ToString(blockfrostKeyPtr);
+
+    console.log("[CardanoBridgeWebGL] FetchDaoProposals called");
+
+    if (typeof window.FetchDaoProposals !== 'function') {
+      SendMessage(gameObjectName, errorCallback, "FetchDaoProposals not loaded. Ensure dao-csl.js is loaded.");
+      return;
+    }
+
+    window.FetchDaoProposals(gameObjectName, successCallback, errorCallback, blockfrostKey)
+      .catch(function(err) {
+        console.error("[CardanoBridgeWebGL] FetchDaoProposals error:", err);
+      });
+  },
+
+  // ============================================================
+  // CardanoBridge_CreateDaoProposal
+  // ============================================================
+  CardanoBridge_CreateDaoProposal: function(gameObjectNamePtr, successCallbackPtr, errorCallbackPtr, blockfrostKeyPtr, policyIdPtr, titlePtr, descriptionPtr) {
+    var gameObjectName = UTF8ToString(gameObjectNamePtr);
+    var successCallback = UTF8ToString(successCallbackPtr);
+    var errorCallback = UTF8ToString(errorCallbackPtr);
+    var blockfrostKey = UTF8ToString(blockfrostKeyPtr);
+    var policyId = UTF8ToString(policyIdPtr);
+    var title = UTF8ToString(titlePtr);
+    var description = UTF8ToString(descriptionPtr);
+
+    console.log("[CardanoBridgeWebGL] CreateDaoProposal called:", title);
+
+    if (typeof window.CreateDaoProposal !== 'function') {
+      SendMessage(gameObjectName, errorCallback, "CreateDaoProposal not loaded. Ensure dao-csl.js is loaded.");
+      return;
+    }
+
+    if (!window.__walletApi) {
+      SendMessage(gameObjectName, errorCallback, "Wallet not connected. Connect via CIP-30 first.");
+      return;
+    }
+
+    window.CreateDaoProposal(gameObjectName, successCallback, errorCallback, blockfrostKey, policyId, title, description)
+      .catch(function(err) {
+        console.error("[CardanoBridgeWebGL] CreateDaoProposal error:", err);
+      });
+  },
+
+  // ============================================================
+  // CardanoBridge_VoteOnDaoProposal
+  // ============================================================
+  CardanoBridge_VoteOnDaoProposal: function(gameObjectNamePtr, successCallbackPtr, errorCallbackPtr, blockfrostKeyPtr, proposalTxHashPtr, proposalTxIndexInt, voteTypePtr) {
+    var gameObjectName = UTF8ToString(gameObjectNamePtr);
+    var successCallback = UTF8ToString(successCallbackPtr);
+    var errorCallback = UTF8ToString(errorCallbackPtr);
+    var blockfrostKey = UTF8ToString(blockfrostKeyPtr);
+    var proposalTxHash = UTF8ToString(proposalTxHashPtr);
+    var proposalTxIndex = proposalTxIndexInt;
+    var voteType = UTF8ToString(voteTypePtr);
+
+    console.log("[CardanoBridgeWebGL] VoteOnDaoProposal called:", voteType, "on", proposalTxHash + "#" + proposalTxIndex);
+
+    if (typeof window.VoteOnDaoProposal !== 'function') {
+      SendMessage(gameObjectName, errorCallback, "VoteOnDaoProposal not loaded. Ensure dao-csl.js is loaded.");
+      return;
+    }
+
+    if (!window.__walletApi) {
+      SendMessage(gameObjectName, errorCallback, "Wallet not connected. Connect via CIP-30 first.");
+      return;
+    }
+
+    window.VoteOnDaoProposal(gameObjectName, successCallback, errorCallback, blockfrostKey, proposalTxHash, proposalTxIndex, voteType)
+      .catch(function(err) {
+        console.error("[CardanoBridgeWebGL] VoteOnDaoProposal error:", err);
+      });
+  },
+
+  // ============================================================
   // CardanoBridge_IncrementCounter
   // ============================================================
   // Increments an Aiken counter smart contract using pure CSL + Blockfrost + CIP-30.
