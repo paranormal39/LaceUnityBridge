@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Midnight SDK Bundle Test</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1a1a2e; color: #eee; }
+    .pass { color: #4ade80; }
+    .fail { color: #f87171; }
+    .warn { color: #fbbf24; }
+    .info { color: #60a5fa; }
+    pre { background: #16213e; padding: 10px; border-radius: 4px; overflow-x: auto; }
+    button { padding: 10px 20px; margin: 5px; cursor: pointer; font-size: 14px; }
+    h1 { color: #a78bfa; }
+    h3 { color: #7c3aed; }
+    .status { padding: 15px; margin: 10px 0; border-radius: 8px; }
+    .found { background: #2d5a27; }
+    .not-found { background: #5a2727; }
+  </style>
+</head>
+<body>
+  <h1>Midnight SDK Bundle Test</h1>
+  <p>Tests the Midnight SDK bundle (window.MidnightSDK) alongside existing Cardano tools.</p>
+  <p><strong>Note:</strong> This does NOT replace the Cardano/MeshSDK bundle. Both can coexist.</p>
+
+  <div id="status" class="status not-found">Checking...</div>
+
+  <h3>Actions</h3>
+  <button onclick="runTests()">Run Tests</button>
+  <button onclick="debugDump()">Debug Dump</button>
+  <button onclick="tryConnect()">Try Connect</button>
+  <button onclick="tryGetState()">Get Wallet State</button>
+
+  <h3>Console Output</h3>
+  <pre id="output"></pre>
+
+  <!-- Midnight SDK bundle -->
+  <script src="dist/midnight-sdk.bundle.js"></script>
+
+  <script>
+    var output = document.getElementById('output');
+    var statusEl = document.getElementById('status');
+
+    function log(msg, cls) {
+      var div = document.createElement('div');
+      div.className = cls || 'info';
+      div.textContent = msg;
+      output.appendChild(div);
+      console.log(msg);
+    }
+
+    function setStatus(msg, found) {
+      statusEl.textContent = msg;
+      statusEl.className = 'status ' + (found ? 'found' : 'not-found');
+    }
+
+    async function runTests() {
+      output.innerHTML = '';
+      log('=== Midnight SDK Bundle Test ===');
+      log('Time: ' + new Date().toISOString());
+      log('');
+
+      // Test 1: window.MidnightSDK exists
+      if (typeof window.MidnightSDK !== 'undefined') {
+        log('PASS: window.MidnightSDK exists', 'pass');
+        log('  Exports: ' + Object.keys(window.MidnightSDK).join(', '), 'info');
+        log('  Version: ' + window.MidnightSDK.version, 'info');
+        log('  Build: ' + window.MidnightSDK.buildTime, 'info');
+      } else {
+        log('FAIL: window.MidnightSDK is undefined', 'fail');
+        setStatus('Bundle not loaded', false);
+        return;
+      }
+
+      // Test 2: Wait for ready
+      log('');
+      log('Waiting for MidnightSDKReadyPromise...');
+      try {
+        await window.MidnightSDKReadyPromise;
+        if (window.MidnightSDKReady) {
+          log('PASS: MidnightSDK is ready', 'pass');
+        }
+        if (window.MidnightSDKError) {
+          log('WARN: MidnightSDKError: ' + window.MidnightSDKError, 'warn');
+        }
+      } catch (e) {
+        log('FAIL: MidnightSDKReadyPromise rejected: ' + e.message, 'fail');
+      }
+
+      // Test 3: Check connector availability
+      log('');
+      var available = window.MidnightSDK.isConnectorAvailable();
+      if (available) {
+        log('PASS: Midnight connector IS available', 'pass');
+        var found = window.MidnightSDK.findMidnightConnector();
+        if (found) {
+          log('  Path: ' + found.path, 'info');
+          log('  Name: ' + (found.connector.name || 'unknown'), 'info');
+          log('  API Version: ' + (found.connector.apiVersion || 'unknown'), 'info');
+          log('  Has enable(): ' + (typeof found.connector.enable === 'function'), 'info');
+          log('  Has isEnabled(): ' + (typeof found.connector.isEnabled === 'function'), 'info');
+          log('  Has serviceUriConfig(): ' + (typeof found.connector.serviceUriConfig === 'function'), 'info');
+        }
+        setStatus('Midnight connector found at: ' + (found ? found.path : 'unknown'), true);
+      } else {
+        log('WARN: Midnight connector NOT available', 'warn');
+        log('  Install Lace wallet with Midnight mode enabled', 'warn');
+        setStatus('Midnight connector not found', false);
+      }
+
+      // Test 4: Check existing Cardano tools still work
+      log('');
+      log('--- Existing Cardano checks (should still work) ---');
+      if (typeof window.MeshSDK !== 'undefined') {
+        log('PASS: window.MeshSDK still exists (Cardano mesh-bridge)', 'pass');
+      } else {
+        log('INFO: window.MeshSDK not loaded (mesh-bridge bundle not included in this test page)', 'info');
+      }
+      if (typeof window.CardanoWasm !== 'undefined') {
+        log('PASS: window.CardanoWasm still exists (csl-bundle)', 'pass');
+      } else {
+        log('INFO: window.CardanoWasm not loaded (csl-bundle not included in this test page)', 'info');
+      }
+      if (window.cardano) {
+        log('PASS: window.cardano exists, keys: ' + Object.keys(window.cardano).join(', '), 'pass');
+      } else {
+        log('INFO: window.cardano not present', 'info');
+      }
+
+      log('');
+      log('=== Tests Complete ===');
+    }
+
+    function debugDump() {
+      output.innerHTML = '';
+      log('=== Debug Dump ===');
+      if (window.MidnightSDK) {
+        window.MidnightSDK.debugDump();
+        log('(Check browser console for full output)', 'info');
+      } else {
+        log('FAIL: window.MidnightSDK not loaded', 'fail');
+      }
+    }
+
+    async function tryConnect() {
+      output.innerHTML = '';
+      log('=== Attempting Connection ===');
+      if (!window.MidnightSDK) {
+        log('FAIL: window.MidnightSDK not loaded', 'fail');
+        return;
+      }
+      try {
+        var result = await window.MidnightSDK.connect();
+        log('PASS: Connected!', 'pass');
+        log('  Connector: ' + result.connectorPath, 'info');
+        if (result.walletState) {
+          log('  Address: ' + (result.walletState.address || 'N/A'), 'info');
+          log('  Coin Public Key: ' + (result.walletState.coinPublicKey || 'N/A'), 'info');
+          log('  Full state: ' + JSON.stringify(result.walletState, null, 2), 'info');
+        }
+        if (result.serviceUriConfig) {
+          log('  Service URIs: ' + JSON.stringify(result.serviceUriConfig, null, 2), 'info');
+        }
+        setStatus('Connected via ' + result.connectorPath, true);
+      } catch (e) {
+        log('FAIL: ' + e.message, 'fail');
+        setStatus('Connection failed: ' + e.message, false);
+      }
+    }
+
+    async function tryGetState() {
+      output.innerHTML = '';
+      log('=== Getting Wallet State ===');
+      if (!window.MidnightSDK) {
+        log('FAIL: window.MidnightSDK not loaded', 'fail');
+        return;
+      }
+      if (!window.MidnightSDK.isConnected()) {
+        log('WARN: Not connected yet. Click "Try Connect" first.', 'warn');
+        return;
+      }
+      try {
+        var state = await window.MidnightSDK.getWalletState();
+        log('PASS: Got wallet state', 'pass');
+        log(JSON.stringify(state, null, 2), 'info');
+      } catch (e) {
+        log('FAIL: ' + e.message, 'fail');
+      }
+    }
+
+    // Auto-run tests after short delay
+    setTimeout(runTests, 500);
+  </script>
+</body>
+</html>

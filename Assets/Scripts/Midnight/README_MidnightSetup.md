@@ -27,12 +27,28 @@ This project currently connects reliably via **Cardano CIP-30** (because `window
 Assets/
 ├── Plugins/
 │   └── WebGL/
-│       └── MidnightWebGL.jslib    # JavaScript bridge (wallet API calls)
+│       ├── MidnightWebGL.jslib        # JavaScript bridge (wallet API calls)
+│       └── midnight-sdk.bundle.js     # Midnight SDK bundle (from midnight-bridge)
 └── Scripts/
     └── Midnight/
-        ├── MidnightBridge.cs      # C# bindings and UI logic
-        ├── MidnightUISetup.cs     # Runtime UI creation helper
+        ├── MidnightBridge.cs          # C# bindings and UI logic
+        ├── MidnightUISetup.cs         # Runtime UI creation helper
         └── README_MidnightSetup.md
+
+web/
+├── mesh-bridge/       # Cardano MeshSDK bundle (window.MeshSDK)
+├── csl-bundle/        # Cardano Serialization Lib bundle (window.CardanoWasm)
+└── midnight-bridge/   # Midnight SDK bundle (window.MidnightSDK)
+    ├── package.json
+    ├── build.mjs              # esbuild config with WASM inlining
+    ├── tsconfig.json
+    ├── test.html              # Standalone browser test page
+    ├── scripts/
+    │   └── copy-to-unity.js   # Copies bundle to Unity assets
+    ├── src/
+    │   └── midnight-unity-bridge.ts   # Entry point
+    └── dist/
+        └── midnight-sdk.bundle.js     # Built bundle (14.2MB)
 ```
 
 ---
@@ -143,6 +159,43 @@ If you see a Cardano hex address (and the UI says `Connected (Cardano)`), that�
 
 ---
 
+## Midnight SDK Bundle (midnight-bridge)
+
+The `web/midnight-bridge/` project bundles `@meshsdk/midnight-setup` and all `@midnight-ntwrk` packages into a single browser-ready JS file (`midnight-sdk.bundle.js`). This exposes `window.MidnightSDK` with:
+
+- **Connector detection**: `isConnectorAvailable()`, `findMidnightConnector()`
+- **Wallet connection**: `connect()`, `disconnect()`, `isConnected()`
+- **Wallet state**: `getWalletState()`, `getAddress()`, `getCoinPublicKey()`
+- **Transactions**: `balanceAndProveTransaction()`, `submitTransaction()`
+- **MeshJS providers**: `setupProviders()` for full contract deployment
+- **Debug**: `debugDump()` logs all connector paths to console
+
+### Building the Midnight Bundle
+
+```bash
+cd web/midnight-bridge
+npm install
+npm run build          # builds dist/midnight-sdk.bundle.js
+npm run build:copy     # builds + copies to Unity assets
+```
+
+### Using in HTML
+
+```html
+<script src="midnight-sdk.bundle.js"></script>
+<script>
+  await window.MidnightSDKReadyPromise;
+  if (window.MidnightSDK.isConnectorAvailable()) {
+    const result = await window.MidnightSDK.connect();
+    console.log('Address:', result.walletState?.address);
+  }
+</script>
+```
+
+**Note:** This bundle coexists with the existing Cardano bundles (`window.MeshSDK`, `window.CardanoWasm`). Nothing is replaced.
+
+---
+
 ## Architecture
 
 ```
@@ -152,7 +205,7 @@ Unity C# (MidnightBridge.cs)
         ↓
 WebGL .jslib (MidnightWebGL.jslib)
         ↓
-    window.cardano.lace OR window.midnight.*
+    window.cardano.lace OR window.midnight.* OR window.MidnightSDK
         ↓
 Lace Wallet Extension
         ↓

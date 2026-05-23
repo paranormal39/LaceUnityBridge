@@ -194,7 +194,51 @@ CardanoBridge.Instance.GetBalance();
 CardanoBridge.Instance.IncrementCounter();
 ```
 
-### MidnightBridge
+### MidnightSDK (New Static API)
+
+```csharp
+// Initialize and detect wallet
+MidnightSDK.Initialize(
+    onReady: () => Debug.Log("Wallet detected!"),
+    onWalletNotFound: () => Debug.Log("Install Lace")
+);
+
+// Connect to Midnight Preprod
+MidnightSDK.Connect(
+    onSuccess: wallet => Debug.Log($"Connected: {wallet.Address}"),
+    onError: error => Debug.LogError(error)
+);
+
+// Get tDUST balance
+MidnightSDK.GetBalance(
+    onSuccess: balance => Debug.Log($"Balance: {balance.NativeFormatted}"),
+    onError: error => Debug.LogError(error)
+);
+
+// Counter contract operations
+MidnightSDK.ReadCounter(
+    onSuccess: result => Debug.Log($"Counter: {result.Counter}"),
+    onError: error => Debug.LogError(error)
+);
+
+MidnightSDK.IncrementCounter(
+    onSuccess: result => Debug.Log($"New value: {result.Counter}, TX: {result.TxHash}"),
+    onError: error => Debug.LogError(error)
+);
+
+// Properties
+MidnightSDK.IsConnected        // bool
+MidnightSDK.IsWalletAvailable  // bool
+MidnightSDK.Wallet             // WalletInfo (Address, Mode, Network)
+MidnightSDK.CurrentState       // State enum
+
+// Events
+MidnightSDK.OnConnected += wallet => { };
+MidnightSDK.OnDisconnected += () => { };
+MidnightSDK.OnError += error => { };
+```
+
+### MidnightBridge (Legacy UI)
 
 ```csharp
 // Properties
@@ -266,14 +310,294 @@ Detect and connect to Lace/Eternl/Nami, display address/balance, send ADA paymen
 ### Milestone 2 — Plutus V3 Smart Contract Interaction ✅
 Full Aiken counter dApp increment from Unity WebGL. Confirmed on-chain on Preprod.
 
-### Milestone 3 — Midnight Network Integration 🔜
-Connect to Midnight via Lace's Midnight DApp connector. Shielded addresses and tDUST/tNIGHT workflows.
+### Milestone 3 — Midnight Network Integration ✅
+Connect to Midnight Preprod via Lace's Midnight DApp Connector API v4.0.x. Shielded addresses, tDUST balance, and configuration retrieval.
 
-### Milestone 4 — Counter Smart Contract on Midnight 🔜
-Deploy the counter on Midnight using Compact. Compare Plutus V3 vs Compact developer experience.
+### Milestone 4 — Counter Smart Contract on Midnight 🟢 _submit works, finalization read-back mitigated_
+Read **and** increment the live Counter contract on **Midnight Preview** at `8c31306d…cd88dd`. Unity C# API: `MidnightSDK.ReadCounter()`, `MidnightSDK.IncrementCounter()`.
+
+- ✅ `ReadCounter()` — queries indexer v4 GraphQL, returns the on-chain `round`.
+- ✅ `IncrementCounter()` builds → balances → signs → submits a hex-encoded transaction via Lace v4. First on-chain submit (2026-05-19): [`2f0ee3e3…e8f4`](https://explorer.preview.midnight.network/transactions/2f0ee3e3fb0d5c57622797a45493709210e9b27cec44b3dac6b432d74fc0e8f4).
+- 🟡 `publicDataProvider.watchForTxData(txId)` can hang indefinitely. **Mitigation added (2026-05-19 PM):** 2-minute timeout around the internal watcher + manual `ReadCounter()` polling fallback. The UI no longer freezes forever; if the watcher hangs, the bridge polls the indexer directly until the counter updates. Unity receives `{ success: true, timedOut: true/false, newCounter: N+1 }`.
+
+> **Key learning during the 2026-05-19 fix:** Lace dApp connector **v4** is **string-based** — `balanceUnsealedTransaction` / `submitTransaction` take hex-encoded transaction *strings*, not the raw wasm-bindgen `Transaction` object. The bridge serializes (`tx.serialize()` → hex) at the wallet boundary. See `handover_01.md` §⭐ Session 03 for the root-cause walkthrough and the cause-chain unwrap debugging plumbing.
 
 ### Milestone 5 — Expanded Cardano System 🔜
 Multi-asset support, reference scripts, proper coin selection, stake delegation, multi-wallet.
+
+---
+
+## Midnight Bridge — Dependencies & Architecture
+
+The Midnight side is the "complex" half of the bridge. This section exists so you can see **exactly what is bundled into `midnight-sdk.bundle.js`** and read up on each piece without spelunking through `web/midnight-bridge/`.
+
+### High-level diagram
+
+```
+Unity C# (MidnightSDK.cs / MidnightDiagnostics.cs)
+   │  DllImport
+   ▼
+Assets/Plugins/WebGL/MidnightWebGL.jslib
+   │  window.MidnightSDK.<fn>
+   ▼
+midnight-sdk.bundle.js (built from web/midnight-bridge/src/midnight-unity-bridge.ts)
+   │
+   ├── Lace wallet (window.midnight.<uuid>)  ← signs + submits tx
+   ├── Indexer GraphQL (preview.midnight.network/api/v4/graphql)
+   ├── Proof server (proving.preview.midnight.network)
+   └── Local StreamingAssets/zk/counter/      ← verifier + prover keys
+```
+
+The bundle is a single ~19 MB IIFE that exposes `window.MidnightSDK`. All Node-isms (`Buffer`, `process`, `crypto`, `stream`, `fs`, `path`, `assert`) are polyfilled at build time by `web/midnight-bridge/build.mjs`.
+
+### Midnight Network packages (the actual SDK)
+
+> All pinned to the **Midnight 4.0.x line** because the live Preview network runs ledger-v8 `8.0.3`. See `PROJECT_PLAN.md` §1.5 for why every version below matters.
+
+| Package | Version | Role | Docs |
+|---|---|---|---|
+| `@midnight-ntwrk/dapp-connector-api` | `4.0.1` | TypeScript types for the wallet ↔ dApp protocol (`connect`, `enable`, `getShieldedAddresses`, `submitTransaction`, etc.). | [docs.midnight.network](https://docs.midnight.network/develop/tutorial/building/dapp-connector) |
+| `@midnight-ntwrk/ledger-v8` | **`8.0.3` exact** | Rust→WASM core ledger. CBOR-encodes / signs / hashes transactions. Pinned exact — `^8.x` resolves to 8.1.0 which the live network rejects. | [npm](https://www.npmjs.com/package/@midnight-ntwrk/ledger-v8) |
+| `@midnight-ntwrk/onchain-runtime` | (transitive) | Compact circuit execution runtime; bundled via `ledger-v8`. | — |
+| `@midnight-ntwrk/compact-runtime` | **`0.15.0` exact** | The runtime Compact circuits target. Must match the `compactc +0.30.0` output our vendored contract was compiled with. | [Compact docs](https://docs.midnight.network/develop/tutorial/building/compact) |
+| `@midnight-ntwrk/midnight-js-contracts` | `^4.0.4` | High-level `findDeployedContract` / `callTx` helpers. This is what `incrementCounter()` ultimately drives. | [GitHub](https://github.com/midnightntwrk/midnight-js) |
+| `@midnight-ntwrk/midnight-js-indexer-public-data-provider` | `^4.0.4` | Talks v4 GraphQL to `indexer.preview.midnight.network/api/v4/graphql` to read on-chain state. | [GitHub](https://github.com/midnightntwrk/midnight-js) |
+| `@midnight-ntwrk/midnight-js-fetch-zk-config-provider` | `^4.0.4` | Loads ZK prover keys + verifier keys + IR over HTTP. We point it at `StreamingAssets/zk/counter/`. | [GitHub](https://github.com/midnightntwrk/midnight-js) |
+| `@midnight-ntwrk/midnight-js-http-client-proof-provider` | `^4.0.4` | Sends unproven txs to the remote proof server (`proving.preview.midnight.network`) — proof generation cannot run in-browser. | [GitHub](https://github.com/midnightntwrk/midnight-js) |
+| `@midnight-ntwrk/midnight-js-level-private-state-provider` | `^4.0.4` | Persists per-account private state + signing keys in browser **IndexedDB** (via `level`). Encrypts at rest with PBKDF2-derived key. **Requires password ≥ 16 chars + 3 character classes.** | [npm](https://www.npmjs.com/package/@midnight-ntwrk/midnight-js-level-private-state-provider) |
+| `@midnight-ntwrk/midnight-js-network-id` | `^4.0.4` | Tiny helper that resolves `preview` / `preprod` / `mainnet` → network-id constants. | — |
+| `@midnight-ntwrk/midnight-js-types` | `^4.0.4` | Shared TS interfaces for all the providers above. | — |
+| `@midnight-ntwrk/wallet-sdk-address-format` | **`3.1.1` exact (+ npm `overrides`)** | bech32m encoding of Midnight shielded addresses. **Module-load `Symbol`** — must dedupe to one copy or `printWalletSummary` crashes with identity-mismatch. | [npm](https://www.npmjs.com/package/@midnight-ntwrk/wallet-sdk-address-format) |
+| `@midnight-ntwrk/counter-contract` | `file:vendor/counter-contract` | The vendored compiled output of the example Compact counter contract — `Contract`, `witnesses`, `ledger`, plus ZK keys. **Compiled with `compactc +0.30.0`.** | [example-counter repo](https://github.com/midnightntwrk/example-counter) |
+| `@meshsdk/midnight-setup` | `^1.9.0-beta.98` | Installed but **unused at runtime** (its `dist/` is missing). Code falls back to wallet API directly. Candidate for removal. | [meshjs.dev](https://meshjs.dev/) |
+
+### Browser polyfills (Node std-lib → browser)
+
+These exist purely because the Midnight SDK was written assuming Node. The aliases live in `web/midnight-bridge/build.mjs`.
+
+| Node API | Browser provider | Why we need it |
+|---|---|---|
+| `crypto` | **`crypto-browserify`** | `pbkdf2Sync`, `createHmac`, `createCipheriv` / `createDecipheriv`, `createHash`, `randomBytes` — all used by the level private-state provider for AES-CBC + PBKDF2 storage encryption. _(Previously a hand-rolled stub — was the cause of `crypto.pbkdf2Sync not available` errors.)_ |
+| `stream` | `stream-browserify` | Used by `level` / `abstract-level` for reading IndexedDB streams. |
+| `buffer` | `buffer/` | `Buffer.from`, `Buffer.concat`, etc., for CBOR encoding. |
+| `events` | `events/` | Node `EventEmitter` for the indexer GraphQL subscription client. |
+| `fs`, `path`, `assert` | `src/shims/*.js` | Tiny stubs — only touched on import paths that never actually execute in the browser. |
+| `process`, `global` | Banner in `build.mjs` | Tiny inline polyfill: `process.env.NODE_ENV='production'`, `process.browser=true`, `globalThis.global=globalThis`. |
+
+### WASM handling
+
+`@midnight-ntwrk/ledger-v8` ships two wasm-bindgen modules (`midnight_ledger_wasm`, `midnight_onchain_runtime_wasm`). The total inlined size is > 8 MB, which Chrome refuses to compile synchronously on the main thread. The custom `wasmBindgenPlugin` in `build.mjs` rewrites these to:
+
+- **Async** `WebAssembly.compile` / `instantiate` when the wasm is ≥ 4 MB.
+- **Sync** `new WebAssembly.Module` / `new WebAssembly.Instance` when smaller (some downstream code reads exports synchronously right after init).
+- **Base64-inlined** so there's a single `.bundle.js` file — no separate `.wasm` to host or CORS.
+
+### ZK artifacts (served, not bundled)
+
+The verifier + prover keys are too large to inline and live in `Assets/StreamingAssets/zk/counter/`:
+
+| File | Purpose |
+|---|---|
+| `keys/increment.prover` | Prover key — used by the remote proof server to generate the ZK proof. |
+| `keys/increment.verifier` | Verifier key — checked on-chain. |
+| `zkir/increment.bzkir` + `zkir/increment.zkir` | Circuit IR. |
+
+These are copied verbatim from `node_modules/@midnight-ntwrk/counter-contract/managed/counter/`. Unity serves `StreamingAssets/` from the WebGL build root, so the bundle fetches them from `${origin}/StreamingAssets/zk/counter/`.
+
+### Environment endpoints (Preview)
+
+| Service | URL |
+|---|---|
+| Indexer GraphQL | `https://indexer.preview.midnight.network/api/v4/graphql` |
+| Indexer WS | `wss://indexer.preview.midnight.network/api/v4/graphql` |
+| Proof server | `https://proof-server.preview.midnight.network` _(public)_ — wallet-provided URI takes precedence; `proverServerUri` is deprecated in v4 in favour of `api.getProvingProvider()` (see PROJECT_PLAN §1.8) |
+| Wallet | Lace browser extension (`window.midnight.<uuid>`) — **v4 dApp-connector API: all tx methods are hex-string-based** (see PROJECT_PLAN §5.15) |
+| Live counter contract | `8c31306d717dd2b79f30785ae7f0f5241f6f891d63441827395d8be1fecd88dd` |
+| First successful increment tx | [`2f0ee3e3fb0d5c57622797a45493709210e9b27cec44b3dac6b432d74fc0e8f4`](https://explorer.preview.midnight.network/transactions/2f0ee3e3fb0d5c57622797a45493709210e9b27cec44b3dac6b432d74fc0e8f4) |
+
+### Build commands
+
+```bash
+cd web/midnight-bridge
+npm install --legacy-peer-deps   # peer conflict between meshsdk and dapp-connector-api 4.x
+npm run build                    # produces dist/midnight-sdk.bundle.js
+npm run build:copy               # builds + copies into Assets/WebGLTemplates/MidnightTemplate/TemplateData/
+```
+
+After `build:copy`, bump the cache-bust `?v=` in `Assets/WebGLTemplates/MidnightTemplate/index.html` (or hard-refresh).
+
+### Recommended reading order (if you want to actually understand it)
+
+1. [Midnight DApp Connector tutorial](https://docs.midnight.network/develop/tutorial/building/dapp-connector) — what `connect()`, `enable()`, `getShieldedAddresses()` do.
+2. [Compact language tour](https://docs.midnight.network/develop/tutorial/building/compact) — how the counter contract is written.
+3. [`@midnight-ntwrk/midnight-js` README](https://github.com/midnightntwrk/midnight-js) — providers, `findDeployedContract`, `callTx`.
+4. [`example-counter`](https://github.com/midnightntwrk/example-counter) — the reference dApp our bridge mirrors.
+5. `PROJECT_PLAN.md` §1.5 (this repo) — version-pin matrix and the traps we've already hit.
+6. `handover_01.md` (this repo) — the session-by-session debug log.
+
+---
+
+## Midnight Preprod Integration
+
+> ⚠️ **Note:** The text below predates the 2026-05-16 switch to Midnight **Preview**. The live counter is on **Preview** at `8c31306d…cd88dd`. Treat the "Preprod" references below as illustrative — defaults in code now point at Preview.
+
+This project now supports **Midnight Preprod** network as a completely separate adapter from Cardano.
+
+### Architecture
+
+```
+Unity C# (MidnightDiagnostics.cs)
+    ↓
+MidnightWebGL.jslib (MidnightPreprod_* functions)
+    ↓
+midnight-bridge.js
+    ↓
+midnight.bundle.js (bundled npm dependencies)
+    ↓
+window.midnight.mnLace
+    ↓
+Midnight Preprod Network
+```
+
+**Cardano and Midnight are completely separate pipelines:**
+
+| Aspect | Cardano | Midnight |
+|--------|---------|----------|
+| **Wallet API** | `window.cardano.lace` (CIP-30) | `window.midnight.mnLace` |
+| **Connection** | `enable()` | `connect('preprod')` |
+| **Addresses** | `getUsedAddresses()` | `getShieldedAddresses()` |
+| **Tx Building** | CSL + Blockfrost | Compact + Wallet Prover |
+| **Contract Lang** | Plutus/Aiken | Compact |
+
+### Installing Lace Midnight Preview
+
+1. Install **Lace Wallet** from [lace.io](https://www.lace.io/)
+2. Enable **Midnight mode** in Lace settings
+3. Switch to **Preprod** network
+4. Request **tDUST** from [Midnight Faucet](https://midnight.network/test-faucet/)
+
+### Target Contract
+
+| Property | Value |
+|----------|-------|
+| **Network** | Preprod |
+| **Contract Address** | `d367654634bb80def09c830b373839bd99076c040db135d0d39639d5328a2436` |
+| **Contract** | Counter |
+| **Public State** | `round` |
+| **Circuit** | `increment()` |
+
+### Building midnight.bundle.js
+
+```bash
+cd web/midnight-bundle
+npm install
+npm run build          # builds dist/midnight.bundle.js
+npm run build:copy     # builds + copies to Unity assets
+```
+
+### Testing in Unity WebGL
+
+1. Add `MidnightDiagnostics` component to a GameObject
+2. Build for WebGL with `MidnightTemplate`
+3. Serve over HTTP (not `file://`)
+4. Click **Connect** to connect to Midnight Preprod
+5. Shielded address and configuration will display
+
+### API Flow
+
+```javascript
+// 1. Detect wallet
+window.midnight.mnLace  // must exist
+
+// 2. Connect to preprod
+const api = await window.midnight.mnLace.connect('preprod');
+
+// 3. Get wallet info
+const status = await api.getConnectionStatus();
+const addresses = await api.getShieldedAddresses();
+const config = await api.getConfiguration();
+
+// 4. Contract interaction (requires midnight.bundle.js)
+// - Join contract
+// - Read state via indexer
+// - Build tx, balance & prove via wallet, submit
+```
+
+### Security Warning
+
+⚠️ **Never publish wallet seed phrases in repositories or documentation.**
+
+All signing happens inside the Lace wallet extension. Unity never handles private keys.
+
+---
+
+## Midnight Preprod Counter Demo
+
+This demo shows how to interact with a deployed Counter smart contract on Midnight Preprod.
+
+### Contract Details
+
+| Field | Value |
+|-------|-------|
+| **Network** | Preprod |
+| **Contract Address** | `d367654634bb80def09c830b373839bd99076c040db135d0d39639d5328a2436` |
+| **Public State** | `round: Counter` |
+| **Circuit** | `increment()` |
+
+### Manual Test Steps
+
+1. **Connect to Wallet**
+   - Click the **🌙 Midnight Test** button (top-left)
+   - Click **Connect Midnight**
+   - Approve the connection in Lace Midnight Preview
+   - Console should show `[MidnightTest]` logs with `connected: true, authorized: true`
+
+2. **Read Counter**
+   - Click **Read Counter** in Unity UI
+   - Current `round` value displays
+   - No wallet connection required for reading
+
+3. **Increment Counter**
+   - Must be connected first
+   - Click **Increment Counter**
+   - Approve the transaction in Lace
+   - Wait for confirmation (~3 seconds)
+   - New counter value displays
+
+### Console Commands
+
+```javascript
+// Connect with two-phase authorization
+await MidnightSDK.connectPreprod()
+
+// Read counter (no connection required)
+await MidnightSDK.readCounter()
+
+// Increment counter (requires connection)
+await MidnightSDK.incrementCounter()
+
+// Check connection status
+MidnightSDK.isConnected()
+MidnightSDK.isAuthorized()
+```
+
+### Two-Phase Authorization
+
+The Midnight DApp Connector requires two phases:
+
+1. **`connect('preprod')`** - Establishes connection to the network
+2. **`enable()`** - Authorizes API calls (if "Unauthorized request origin" error)
+
+`MidnightSDK.connectPreprod()` handles both phases automatically.
+
+### Console Log Prefixes
+
+| Prefix | Source |
+|--------|--------|
+| `[MidnightSDK]` | TypeScript SDK (midnight-unity-bridge.ts) |
+| `[MidnightTest]` | Midnight connect diagnostic |
+| `[MidnightWebGL]` | Unity .jslib bridge |
+| `[CardanoTest]` | Cardano CIP-30 test (separate) |
 
 ---
 

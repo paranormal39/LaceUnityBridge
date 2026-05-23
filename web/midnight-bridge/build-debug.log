@@ -1,0 +1,145 @@
+
+> midnight-unity-bridge@2.1.0 build
+> node build.mjs
+
+Building Midnight SDK bundle...
+[wasmBindgenPlugin] Plugin registered for build
+[wasmBindgenPlugin] JS onLoad called for: e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\@midnight-ntwrk\ledger-v8\midnight_ledger_wasm.js
+  [wasm-bindgen] Rewriting midnight_ledger_wasm for async browser init
+X [ERROR] Could not resolve "crypto"
+
+    node_modules/@midnight-ntwrk/midnight-js-level-private-state-provider/dist/index.mjs:3:24:
+      3 │ import * as crypto from 'crypto';
+        ╵                         ~~~~~~~~
+
+  The package "crypto" wasn't found on the file system but is built into node. Are you trying to bundle for node? You can use "platform: 'node'" to do that, which will remove this error.
+
+  [wasm-bindgen] Found 24 snippet files for midnight_ledger_wasm
+[wasmBindgenPlugin] JS onLoad called for: e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\@midnight-ntwrk\onchain-runtime-v3\midnight_onchain_runtime_wasm.js
+  [wasm-bindgen] Rewriting midnight_onchain_runtime_wasm for async browser init
+  [wasm-bindgen] Found 0 snippet files for midnight_onchain_runtime_wasm
+[wasmBindgenPlugin] WASM onLoad called for: e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\@midnight-ntwrk\ledger-v8\midnight_ledger_wasm_bg.wasm
+[wasmBindgenPlugin] WASM onLoad called for: e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\@midnight-ntwrk\onchain-runtime-v3\midnight_onchain_runtime_wasm_bg.wasm
+1 error
+Build failed: Error: Build failed with 1 error:
+node_modules/@midnight-ntwrk/midnight-js-level-private-state-provider/dist/index.mjs:3:24: ERROR: Could not resolve "crypto"
+    at failureErrorWithLog (e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:1651:15)
+    at e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:1059:25
+    at runOnEndCallbacks (e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:1486:45)
+    at buildResponseToResult (e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:1057:7)
+    at e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:1086:16
+    at responseCallbacks.<computed> (e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:704:9)
+    at handleIncomingPacket (e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:764:9)
+    at Socket.readFromStdout (e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:680:7)
+    at Socket.emit (node:events:518:28)
+    at addChunk (node:internal/streams/readable:561:12) {
+  errors: [Getter/Setter],
+  warnings: [Getter/Setter]
+}
+
+Attempting lightweight build (connector-only, no provider deps)...
+X [ERROR] Could not resolve "fs"
+
+    node_modules/@midnight-ntwrk/midnight-js-contracts/dist/index.mjs:3:7:
+      3 │ import 'fs';
+        ╵        ~~~~
+
+  The package "fs" wasn't found on the file system but is built into node. Are you trying to bundle for node? You can use "platform: 'node'" to do that, which will remove this error.
+
+X [ERROR] Could not resolve "path"
+
+    node_modules/@midnight-ntwrk/midnight-js-contracts/dist/index.mjs:4:7:
+      4 │ import 'path';
+        ╵        ~~~~~~
+
+  The package "path" wasn't found on the file system but is built into node. Are you trying to bundle for node? You can use "platform: 'node'" to do that, which will remove this error.
+
+X [ERROR] No loader is configured for ".wasm" files: node_modules/@midnight-ntwrk/ledger-v8/midnight_ledger_wasm_bg.wasm
+
+    node_modules/@midnight-ntwrk/ledger-v8/midnight_ledger_wasm.js:1:22:
+      1 │ import * as wasm from "./midnight_ledger_wasm_bg.wasm";
+        ╵                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+X [ERROR] No loader is configured for ".wasm" files: node_modules/@midnight-ntwrk/onchain-runtime-v3/midnight_onchain_runtime_wasm_bg.wasm
+
+    node_modules/@midnight-ntwrk/onchain-runtime-v3/midnight_onchain_runtime_wasm.js:1:22:
+      1 │ import * as wasm from "./midnight_onchain_runtime_wasm_bg.wasm";
+        ╵                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+X [ERROR] Could not resolve "assert"
+
+    node_modules/@subsquid/scale-codec/lib/sink.js:7:41:
+      7 │ const assert_1 = __importDefault(require("assert"));
+        ╵                                          ~~~~~~~~
+
+  The package "assert" wasn't found on the file system but is built into node. Are you trying to bundle for node? You can use "platform: 'node'" to do that, which will remove this error.
+
+X [ERROR] Could not resolve "assert"
+
+    node_modules/@subsquid/scale-codec/lib/src.js:8:41:
+      8 │ const assert_1 = __importDefault(require("assert"));
+        ╵                                          ~~~~~~~~
+
+  The package "assert" wasn't found on the file system but is built into node. Are you trying to bundle for node? You can use "platform: 'node'" to do that, which will remove this error.
+
+X [ERROR] Could not resolve "assert"
+
+    node_modules/@subsquid/scale-codec/lib/codec-json.js:9:41:
+      9 │ const assert_1 = __importDefault(require("assert"));
+        ╵                                          ~~~~~~~~
+
+  The package "assert" wasn't found on the file system but is built into node. Are you trying to bundle for node? You can use "platform: 'node'" to do that, which will remove this error.
+
+X [ERROR] Could not resolve "assert"
+
+    node_modules/@subsquid/scale-codec/lib/codec.js:8:41:
+      8 │ const assert_1 = __importDefault(require("assert"));
+        ╵                                          ~~~~~~~~
+
+  The package "assert" wasn't found on the file system but is built into node. Are you trying to bundle for node? You can use "platform: 'node'" to do that, which will remove this error.
+
+X [ERROR] Could not resolve "assert"
+
+    node_modules/@subsquid/scale-codec/lib/util.js:7:41:
+      7 │ const assert_1 = __importDefault(require("assert"));
+        ╵                                          ~~~~~~~~
+
+  The package "assert" wasn't found on the file system but is built into node. Are you trying to bundle for node? You can use "platform: 'node'" to do that, which will remove this error.
+
+X [ERROR] Could not resolve "assert"
+
+    node_modules/@subsquid/scale-codec/lib/types-codec.js:7:41:
+      7 │ const assert_1 = __importDefault(require("assert"));
+        ╵                                          ~~~~~~~~
+
+  The package "assert" wasn't found on the file system but is built into node. Are you trying to bundle for node? You can use "platform: 'node'" to do that, which will remove this error.
+
+X [ERROR] Could not resolve "assert"
+
+    node_modules/@subsquid/util-internal-hex/lib/hex.js:9:41:
+      9 │ const assert_1 = __importDefault(require("assert"));
+        ╵                                          ~~~~~~~~
+
+  The package "assert" wasn't found on the file system but is built into node. Are you trying to bundle for node? You can use "platform: 'node'" to do that, which will remove this error.
+
+11 errors
+Lightweight build also failed: Error: Build failed with 11 errors:
+node_modules/@midnight-ntwrk/ledger-v8/midnight_ledger_wasm.js:1:22: ERROR: No loader is configured for ".wasm" files: node_modules/@midnight-ntwrk/ledger-v8/midnight_ledger_wasm_bg.wasm
+node_modules/@midnight-ntwrk/midnight-js-contracts/dist/index.mjs:3:7: ERROR: Could not resolve "fs"
+node_modules/@midnight-ntwrk/midnight-js-contracts/dist/index.mjs:4:7: ERROR: Could not resolve "path"
+node_modules/@midnight-ntwrk/onchain-runtime-v3/midnight_onchain_runtime_wasm.js:1:22: ERROR: No loader is configured for ".wasm" files: node_modules/@midnight-ntwrk/onchain-runtime-v3/midnight_onchain_runtime_wasm_bg.wasm
+node_modules/@subsquid/scale-codec/lib/codec-json.js:9:41: ERROR: Could not resolve "assert"
+...
+    at failureErrorWithLog (e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:1651:15)
+    at e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:1059:25
+    at e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:1004:52
+    at buildResponseToResult (e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:1057:7)
+    at e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:1086:16
+    at responseCallbacks.<computed> (e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:704:9)
+    at handleIncomingPacket (e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:764:9)
+    at Socket.readFromStdout (e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:680:7)
+    at Socket.emit (node:events:518:28)
+    at addChunk (node:internal/streams/readable:561:12) {
+  errors: [Getter/Setter],
+  warnings: [Getter/Setter]
+}

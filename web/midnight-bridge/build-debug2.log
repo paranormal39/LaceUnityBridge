@@ -1,0 +1,74 @@
+
+> midnight-unity-bridge@2.1.0 build
+> node build.mjs
+
+Building Midnight SDK bundle...
+[wasmBindgenPlugin] Plugin registered for build
+[wasmBindgenPlugin] JS onLoad called for: e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\@midnight-ntwrk\ledger-v8\midnight_ledger_wasm.js
+  [wasm-bindgen] Rewriting midnight_ledger_wasm for async browser init
+  [wasm-bindgen] Found 24 snippet files for midnight_ledger_wasm
+[wasmBindgenPlugin] WASM onLoad called for: e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\@midnight-ntwrk\ledger-v8\midnight_ledger_wasm_bg.wasm
+[wasmBindgenPlugin] JS onLoad called for: e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\@midnight-ntwrk\onchain-runtime-v3\midnight_onchain_runtime_wasm.js
+  [wasm-bindgen] Rewriting midnight_onchain_runtime_wasm for async browser init
+  [wasm-bindgen] Found 0 snippet files for midnight_onchain_runtime_wasm
+[wasmBindgenPlugin] WASM onLoad called for: e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\@midnight-ntwrk\onchain-runtime-v3\midnight_onchain_runtime_wasm_bg.wasm
+X [ERROR] No matching export in "src/shims/crypto.js" for import "createCipheriv"
+
+    node_modules/@midnight-ntwrk/midnight-js-level-private-state-provider/dist/index.mjs:4:34:
+      4 │ ...randomBytes, pbkdf2Sync, createCipheriv, createDecipheriv, creat...
+        ╵                             ~~~~~~~~~~~~~~
+
+X [ERROR] No matching export in "src/shims/crypto.js" for import "createDecipheriv"
+
+    node_modules/@midnight-ntwrk/midnight-js-level-private-state-provider/dist/index.mjs:4:50:
+      4 │ ...f2Sync, createCipheriv, createDecipheriv, createHash } from 'cry...
+        ╵                            ~~~~~~~~~~~~~~~~
+
+2 errors
+Build failed: Error: Build failed with 2 errors:
+node_modules/@midnight-ntwrk/midnight-js-level-private-state-provider/dist/index.mjs:4:34: ERROR: No matching export in "src/shims/crypto.js" for import "createCipheriv"
+node_modules/@midnight-ntwrk/midnight-js-level-private-state-provider/dist/index.mjs:4:50: ERROR: No matching export in "src/shims/crypto.js" for import "createDecipheriv"
+    at failureErrorWithLog (e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:1651:15)
+    at e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:1059:25
+    at runOnEndCallbacks (e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:1486:45)
+    at buildResponseToResult (e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:1057:7)
+    at e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:1086:16
+    at responseCallbacks.<computed> (e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:704:9)
+    at handleIncomingPacket (e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:764:9)
+    at Socket.readFromStdout (e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:680:7)
+    at Socket.emit (node:events:518:28)
+    at addChunk (node:internal/streams/readable:561:12) {
+  errors: [Getter/Setter],
+  warnings: [Getter/Setter]
+}
+
+Attempting lightweight build (connector-only, no provider deps)...
+X [ERROR] No loader is configured for ".wasm" files: node_modules/@midnight-ntwrk/ledger-v8/midnight_ledger_wasm_bg.wasm
+
+    node_modules/@midnight-ntwrk/ledger-v8/midnight_ledger_wasm.js:1:22:
+      1 │ import * as wasm from "./midnight_ledger_wasm_bg.wasm";
+        ╵                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+X [ERROR] No loader is configured for ".wasm" files: node_modules/@midnight-ntwrk/onchain-runtime-v3/midnight_onchain_runtime_wasm_bg.wasm
+
+    node_modules/@midnight-ntwrk/onchain-runtime-v3/midnight_onchain_runtime_wasm.js:1:22:
+      1 │ import * as wasm from "./midnight_onchain_runtime_wasm_bg.wasm";
+        ╵                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+2 errors
+Lightweight build also failed: Error: Build failed with 2 errors:
+node_modules/@midnight-ntwrk/ledger-v8/midnight_ledger_wasm.js:1:22: ERROR: No loader is configured for ".wasm" files: node_modules/@midnight-ntwrk/ledger-v8/midnight_ledger_wasm_bg.wasm
+node_modules/@midnight-ntwrk/onchain-runtime-v3/midnight_onchain_runtime_wasm.js:1:22: ERROR: No loader is configured for ".wasm" files: node_modules/@midnight-ntwrk/onchain-runtime-v3/midnight_onchain_runtime_wasm_bg.wasm
+    at failureErrorWithLog (e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:1651:15)
+    at e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:1059:25
+    at e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:1004:52
+    at buildResponseToResult (e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:1057:7)
+    at e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:1086:16
+    at responseCallbacks.<computed> (e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:704:9)
+    at handleIncomingPacket (e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:764:9)
+    at Socket.readFromStdout (e:\Projects\Unity\ggj2026\web\midnight-bridge\node_modules\esbuild\lib\main.js:680:7)
+    at Socket.emit (node:events:518:28)
+    at addChunk (node:internal/streams/readable:561:12) {
+  errors: [Getter/Setter],
+  warnings: [Getter/Setter]
+}

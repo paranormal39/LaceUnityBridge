@@ -1,0 +1,16 @@
+
+> midnight-unity-bridge@2.1.0 build
+> node build.mjs
+
+Building Midnight SDK bundle...
+  [wasm-bindgen] Rewriting midnight_ledger_wasm for async browser init
+  [wasm-bindgen] Found 24 snippet files for midnight_ledger_wasm
+  [wasm-bindgen] Rewriting midnight_onchain_runtime_wasm for async browser init
+  [wasm-bindgen] Found 0 snippet files for midnight_onchain_runtime_wasm
+
+  dist\midnight-sdk.bundle.js      18.3mb
+  dist\midnight-sdk.bundle.js.map  26.1mb
+
+Done in 1366ms
+Build complete!
+Output: e:\Projects\Unity\ggj2026\web\midnight-bridge\dist\midnight-sdk.bundle.js

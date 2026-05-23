@@ -9,6 +9,63 @@
   <link rel="stylesheet" href="TemplateData/style.css">
   
   <!-- ============================================================ -->
+  <!-- Page-level wallet detection (main thread only)               -->
+  <!-- Unity jslib runs in a context where window.cardano may be    -->
+  <!-- undefined (worker/threaded). These functions run on the      -->
+  <!-- top-level page where Lace actually injects its connector.    -->
+  <!-- ============================================================ -->
+  <script>
+    // Lace CIP-30 (Cardano side)
+    window.MidnightBridge_IsLaceAvailable = function() {
+      return !!(window.cardano && window.cardano.lace && typeof window.cardano.lace.enable === 'function');
+    };
+    // Any Cardano wallet with enable()
+    window.MidnightBridge_IsCardanoWalletAvailable = function() {
+      if (!window.cardano) return false;
+      var keys = Object.keys(window.cardano);
+      for (var i = 0; i < keys.length; i++) {
+        var w = window.cardano[keys[i]];
+        if (w && typeof w === 'object' && typeof w.enable === 'function') return true;
+      }
+      return false;
+    };
+    // Midnight DApp connector (window.midnight.mnLace etc.)
+    window.MidnightBridge_IsMidnightConnectorAvailable = function() {
+      if (!window.midnight) return false;
+      if (typeof window.midnight.enable === 'function') return true;
+      var keys = Object.keys(window.midnight);
+      for (var i = 0; i < keys.length; i++) {
+        var w = window.midnight[keys[i]];
+        if (w && typeof w === 'object' && typeof w.enable === 'function') return true;
+      }
+      return false;
+    };
+    // Combined: any wallet available (Cardano or Midnight)
+    window.MidnightBridge_IsAnyWalletAvailable = function() {
+      return window.MidnightBridge_IsLaceAvailable() ||
+             window.MidnightBridge_IsCardanoWalletAvailable() ||
+             window.MidnightBridge_IsMidnightConnectorAvailable() ||
+             (typeof window.MidnightSDK !== 'undefined' && window.MidnightSDK.isConnectorAvailable && window.MidnightSDK.isConnectorAvailable());
+    };
+    // Debug: log all detection results
+    window.MidnightBridge_DebugDetection = function() {
+      console.log('[PageDetect] Lace CIP-30:', window.MidnightBridge_IsLaceAvailable());
+      console.log('[PageDetect] Any Cardano wallet:', window.MidnightBridge_IsCardanoWalletAvailable());
+      console.log('[PageDetect] Midnight connector:', window.MidnightBridge_IsMidnightConnectorAvailable());
+      console.log('[PageDetect] MidnightSDK loaded:', typeof window.MidnightSDK !== 'undefined');
+      console.log('[PageDetect] Any wallet:', window.MidnightBridge_IsAnyWalletAvailable());
+      console.log('[PageDetect] window.cardano:', window.cardano ? Object.keys(window.cardano) : 'undefined');
+      console.log('[PageDetect] window.midnight:', window.midnight ? Object.keys(window.midnight) : 'undefined');
+    };
+  </script>
+  
+  <!-- ============================================================ -->
+  <!-- TEMPORARY: Wallet Injection Diagnostic                       -->
+  <!-- Remove after debugging is complete                           -->
+  <!-- ============================================================ -->
+  <script src="wallet-diagnostic.js"></script>
+  
+  <!-- ============================================================ -->
   <!-- CBOR decoder for Cardano multi-asset balance parsing         -->
   <!-- ============================================================ -->
   <script src="https://cdn.jsdelivr.net/npm/cbor-js@0.1.0/cbor.min.js"></script>
@@ -68,20 +125,191 @@
   </script>
   
   <!-- ============================================================ -->
-  <!-- Midnight Counter Bindings - MUST load BEFORE Unity loader    -->
+  <!-- Midnight SDK Bundle - exposes window.MidnightSDK             -->
+  <!-- MUST load BEFORE midnight-counter-bindings.js and Unity      -->
+  <!-- Cache-bust: append ?v=BUILD_STAMP to force reload            -->
   <!-- ============================================================ -->
-  <!-- 
-    IMPORTANT: If you have bundled the Midnight JS SDK, include it here:
-    <script src="midnight-sdk-bundle.js"></script>
+  <script src="TemplateData/midnight-sdk.bundle.js?v=20260522-1840"
+          onerror="console.error('[MidnightTemplate] FAILED to load midnight-sdk.bundle.js — check path/404/CORS')"
+          onload="console.log('[MidnightTemplate] midnight-sdk.bundle.js script tag onload fired')">
+  </script>
+  <script>
+    // Verify MidnightSDK loaded (immediate)
+    (function() {
+      console.log("[MidnightTemplate] Immediate check — window.MidnightSDK:", typeof window.MidnightSDK);
+      if (typeof window.MidnightSDK !== 'undefined') {
+        console.log("[MidnightTemplate] MidnightSDK loaded! version:", window.MidnightSDK.version);
+        console.log("[MidnightTemplate] SDK available: true");
+        console.log("[MidnightTemplate] SDK keys:", Object.keys(window.MidnightSDK));
+        console.log("[MidnightTemplate] Connector available:", window.MidnightSDK.isConnectorAvailable());
+      } else {
+        console.error("[MidnightTemplate] SDK available: false — midnight-sdk.bundle.js failed to load or did not set window.MidnightSDK");
+      }
+      // Also check parent/top (iframe scenario)
+      try { console.log("[MidnightTemplate] parent.MidnightSDK:", typeof parent.MidnightSDK); } catch(e) {}
+      try { console.log("[MidnightTemplate] top.MidnightSDK:", typeof top.MidnightSDK); } catch(e) {}
+    })();
+    // Delayed check in case bundle loads async
+    setTimeout(function() {
+      console.log("[MidnightTemplate] Delayed 2s check — window.MidnightSDK:", typeof window.MidnightSDK);
+      if (typeof window.MidnightSDK !== 'undefined') {
+        console.log("[MidnightTemplate] Delayed check — SDK keys:", Object.keys(window.MidnightSDK));
+      }
+    }, 2000);
+  </script>
+  
+  <!-- ============================================================ -->
+  <!-- App Configuration - Network and Contract Settings            -->
+  <!-- ============================================================ -->
+  <script>
+    // Global configuration state
+    // These are the DEFAULTS - UI controls will update these values
+    window.MidnightConfig = {
+      // Network selection - 'auto' uses whatever network the wallet is on
+      network: 'auto',  // 'auto' | 'preprod' | 'preview'
+      
+      // Midnight Counter contract (Midnight network) - deployed on Preview
+      midnightContractAddress: '8c31306d717dd2b79f30785ae7f0f5241f6f891d63441827395d8be1fecd88dd',
+      useMidnightDefaultContract: true,
+      
+      // DAO contract (Cardano network)
+      daoContractAddress: 'addr_test1wzgxsphtczfamr2cljp80e48544vwp3p4u9n68702t6psgcnkt88j',
+      useDaoDefaultContract: true,
+      
+      // Default values (read-only reference)
+      defaults: {
+        network: 'auto',
+        midnightContractAddress: '8c31306d717dd2b79f30785ae7f0f5241f6f891d63441827395d8be1fecd88dd',
+        daoContractAddress: 'addr_test1wzgxsphtczfamr2cljp80e48544vwp3p4u9n68702t6psgcnkt88j'
+      },
+      
+      // Network support status - both networks supported, auto-detect by default
+      networkSupport: {
+        auto: { supported: true, label: 'Auto (use wallet’s network)' },
+        preview: { supported: true, label: 'Preview' },
+        preprod: { supported: true, label: 'Preprod' }
+      },
+      
+      // Helper to get active Midnight contract address
+      getMidnightContract: function() {
+        return this.useMidnightDefaultContract ? this.defaults.midnightContractAddress : this.midnightContractAddress;
+      },
+      
+      // Helper to get active DAO contract address
+      getDaoContract: function() {
+        return this.useDaoDefaultContract ? this.defaults.daoContractAddress : this.daoContractAddress;
+      },
+      
+      // Helper to reset to defaults
+      resetToDefaults: function() {
+        this.network = this.defaults.network;
+        this.midnightContractAddress = this.defaults.midnightContractAddress;
+        this.daoContractAddress = this.defaults.daoContractAddress;
+        this.useMidnightDefaultContract = true;
+        this.useDaoDefaultContract = true;
+        console.log('[MidnightConfig] Reset to defaults');
+      }
+    };
     
-    The SDK bundle should expose window.MidnightSDK with:
-      - MidnightSDK.Counter (from @midnight-ntwrk/counter-contract)
-      - MidnightSDK.witnesses (from @midnight-ntwrk/counter-contract)
-      - MidnightSDK.indexerPublicDataProvider (from @midnight-ntwrk/midnight-js-indexer-public-data-provider)
-      - MidnightSDK.findDeployedContract (from @midnight-ntwrk/midnight-js-contracts)
-      - MidnightSDK.buildCircuitTransaction (custom helper for building transactions)
-  -->
+    console.log('[MidnightConfig] Initialized with defaults:', {
+      network: window.MidnightConfig.network,
+      midnightContract: window.MidnightConfig.getMidnightContract(),
+      daoContract: window.MidnightConfig.getDaoContract()
+    });
+
+    // ============================================================
+    // MidnightConfigUI - UI bindings for the Configuration panel
+    // ============================================================
+    window.MidnightConfigUI = {
+      onNetworkChange: function(value) {
+        if (value !== 'preprod' && value !== 'preview' && value !== 'auto') {
+          console.warn('[MidnightConfigUI] Invalid network:', value);
+          return;
+        }
+        var prev = window.MidnightConfig.network;
+        window.MidnightConfig.network = value;
+        console.log('[MidnightConfigUI] Network changed:', prev, '->', value);
+
+        // Show warning when on Preprod (Counter contract is on Preview)
+        var warn = document.getElementById('network-warning');
+        if (warn) {
+          warn.style.display = (value === 'preprod') ? 'block' : 'none';
+        }
+
+        // Update status display if visible
+        var statusNet = document.getElementById('status-network');
+        if (statusNet) statusNet.textContent = value;
+      },
+      onMidnightDefaultChange: function(checked) {
+        window.MidnightConfig.useMidnightDefaultContract = checked;
+        var inp = document.getElementById('config-midnight-address');
+        if (inp) inp.disabled = checked;
+        console.log('[MidnightConfigUI] Use Midnight default contract:', checked);
+      },
+      onDaoDefaultChange: function(checked) {
+        window.MidnightConfig.useDaoDefaultContract = checked;
+        var inp = document.getElementById('config-dao-address');
+        if (inp) inp.disabled = checked;
+        console.log('[MidnightConfigUI] Use DAO default contract:', checked);
+      },
+      onMidnightAddressChange: function(value) {
+        window.MidnightConfig.midnightContractAddress = value;
+      },
+      onDaoAddressChange: function(value) {
+        window.MidnightConfig.daoContractAddress = value;
+      },
+      resetToDefaults: function() {
+        window.MidnightConfig.resetToDefaults();
+        // Sync UI controls
+        var sel = document.getElementById('config-network');
+        if (sel) sel.value = window.MidnightConfig.network;
+        var midDef = document.getElementById('config-midnight-default');
+        if (midDef) midDef.checked = true;
+        var daoDef = document.getElementById('config-dao-default');
+        if (daoDef) daoDef.checked = true;
+        var midAddr = document.getElementById('config-midnight-address');
+        if (midAddr) {
+          midAddr.value = window.MidnightConfig.defaults.midnightContractAddress;
+          midAddr.disabled = true;
+        }
+        var daoAddr = document.getElementById('config-dao-address');
+        if (daoAddr) {
+          daoAddr.value = window.MidnightConfig.defaults.daoContractAddress;
+          daoAddr.disabled = true;
+        }
+        var warn = document.getElementById('network-warning');
+        if (warn) warn.style.display = 'none';
+        console.log('[MidnightConfigUI] Reset complete');
+      }
+    };
+  </script>
+  
+  <!-- ============================================================ -->
+  <!-- Midnight Counter Bindings - MUST load AFTER MidnightSDK      -->
+  <!-- ============================================================ -->
   <script src="midnight-counter-bindings.js"></script>
+  
+  <!-- ============================================================ -->
+  <!-- Midnight Preprod Bridge - Separate from Cardano integration  -->
+  <!-- Uses window.midnight.mnLace + connect('preprod')             -->
+  <!-- ============================================================ -->
+  <script src="midnight-bridge.js"></script>
+  <script src="midnight-counter.js"></script>
+  <script>
+    // Verify Midnight Bridge loaded
+    (function() {
+      if (typeof window.MidnightBridge !== 'undefined') {
+        console.log("[MidnightTemplate] MidnightBridge loaded! version:", window.MidnightBridge.version);
+        console.log("[MidnightTemplate] mnLace available:", window.MidnightBridge.isMidnightConnectorAvailable());
+      } else {
+        console.warn("[MidnightTemplate] MidnightBridge not loaded");
+      }
+      if (typeof window.MidnightCounter !== 'undefined') {
+        console.log("[MidnightTemplate] MidnightCounter loaded! version:", window.MidnightCounter.version);
+        console.log("[MidnightTemplate] Default contract:", window.MidnightCounter.DEFAULT_CONTRACT_ADDRESS);
+      }
+    })();
+  </script>
   <!-- ============================================================ -->
 </head>
 <body>
@@ -100,6 +328,548 @@
       <div id="unity-build-title">{{{ PRODUCT_NAME }}}</div>
     </div>
   </div>
+
+  <!-- ============================================================ -->
+  <!-- MIDNIGHT Connector Panel                                     -->
+  <!-- ============================================================ -->
+  <div id="midnight-test-panel" style="position:fixed; top:10px; left:10px; background:#1a1a2e; color:#eee; padding:15px; border-radius:8px; font-family:monospace; font-size:12px; max-width:480px; max-height:90vh; overflow-y:auto; z-index:9999; box-shadow:0 4px 20px rgba(0,0,0,0.5); display:none;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <strong style="font-size:14px;">🌙 Midnight Connector</strong>
+      <button onclick="document.getElementById('midnight-test-panel').style.display='none'" style="background:none; border:none; color:#888; cursor:pointer; font-size:16px;">✕</button>
+    </div>
+    
+    <!-- Network & Contract Configuration -->
+    <div style="margin-bottom:12px; padding:10px; background:#2a2a4e; border-radius:6px;">
+      <div style="font-weight:bold; margin-bottom:8px; color:#9b59b6;">⚙️ Configuration</div>
+      
+      <!-- Network Selector -->
+      <div style="margin-bottom:8px;">
+        <label style="display:block; margin-bottom:4px; font-size:11px; color:#aaa;">Network:</label>
+        <select id="config-network" onchange="window.MidnightConfigUI.onNetworkChange(this.value)" style="width:100%; padding:6px; background:#1a1a2e; color:#eee; border:1px solid #444; border-radius:4px; font-family:monospace;">
+          <option value="auto" selected>Auto (use wallet’s network)</option>
+          <option value="preview">Preview (force)</option>
+          <option value="preprod">Preprod (force)</option>
+        </select>
+        <div id="network-warning" style="display:none; margin-top:4px; padding:4px 6px; background:#8b4513; border-radius:3px; font-size:10px; color:#ffa500;">
+          ⚠️ Counter contract is deployed on Preview — forcing Preprod may fail contract calls
+        </div>
+      </div>
+      
+      <!-- Midnight Contract Address -->
+      <div style="margin-bottom:8px;">
+        <div style="display:flex; align-items:center; margin-bottom:4px;">
+          <label style="font-size:11px; color:#aaa; flex:1;">Midnight Contract:</label>
+          <label style="font-size:10px; color:#888;">
+            <input type="checkbox" id="config-midnight-default" checked onchange="window.MidnightConfigUI.onMidnightDefaultChange(this.checked)" style="margin-right:4px;">
+            Use Default
+          </label>
+        </div>
+        <input type="text" id="config-midnight-address" value="8c31306d717dd2b79f30785ae7f0f5241f6f891d63441827395d8be1fecd88dd" disabled style="width:100%; padding:6px; background:#1a1a2e; color:#888; border:1px solid #333; border-radius:4px; font-family:monospace; font-size:10px; box-sizing:border-box;">
+      </div>
+      
+      <!-- DAO Contract Address -->
+      <div style="margin-bottom:4px;">
+        <div style="display:flex; align-items:center; margin-bottom:4px;">
+          <label style="font-size:11px; color:#aaa; flex:1;">DAO Contract:</label>
+          <label style="font-size:10px; color:#888;">
+            <input type="checkbox" id="config-dao-default" checked onchange="window.MidnightConfigUI.onDaoDefaultChange(this.checked)" style="margin-right:4px;">
+            Use Default
+          </label>
+        </div>
+        <input type="text" id="config-dao-address" value="addr_test1wzgxsphtczfamr2cljp80e48544vwp3p4u9n68702t6psgcnkt88j" disabled style="width:100%; padding:6px; background:#1a1a2e; color:#888; border:1px solid #333; border-radius:4px; font-family:monospace; font-size:10px; box-sizing:border-box;">
+      </div>
+      
+      <!-- Reset Button -->
+      <div style="text-align:right; margin-top:8px;">
+        <button onclick="window.MidnightConfigUI.resetToDefaults()" style="background:#555; color:#ccc; border:none; padding:4px 10px; border-radius:3px; cursor:pointer; font-size:10px;">Reset to Defaults</button>
+      </div>
+    </div>
+    
+    <!-- Status Display -->
+    <div id="midnight-test-status" style="padding:10px; background:#2a2a4e; border-radius:6px; margin-bottom:12px; border-left:3px solid #888;">
+      <div style="font-weight:bold; margin-bottom:6px;">📊 Status</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px; font-size:11px;">
+        <div>Wallet Detected: <span id="status-wallet-detected" style="color:#888;">—</span></div>
+        <div>Connector: <span id="status-connector" style="color:#888;">—</span></div>
+        <div>Connected: <span id="status-connected" style="color:#888;">—</span></div>
+        <div>Network: <span id="status-network" style="color:#888;">—</span></div>
+      </div>
+      <div style="margin-top:6px; font-size:10px; color:#888;">
+        Contract: <span id="status-contract" style="word-break:break-all;">—</span>
+      </div>
+    </div>
+    
+    <!-- Action Buttons -->
+    <div style="margin-bottom:12px; display:flex; flex-wrap:wrap; gap:6px;">
+      <button id="midnight-detect-btn" onclick="window.MidnightTest.detect()" style="background:#555; color:#fff; border:none; padding:8px 14px; border-radius:4px; cursor:pointer; font-size:11px;">🔍 Detect</button>
+      <button id="midnight-connect-btn" onclick="window.MidnightTest.connect()" style="background:#9b59b6; color:#fff; border:none; padding:8px 14px; border-radius:4px; cursor:pointer; font-size:11px;">🔗 Connect</button>
+      <button id="midnight-disconnect-btn" onclick="window.MidnightTest.disconnect()" style="background:#c0392b; color:#fff; border:none; padding:8px 14px; border-radius:4px; cursor:pointer; font-size:11px;">⛓️ Disconnect</button>
+      <button onclick="window.MidnightTest.checkReadiness()" style="background:#27ae60; color:#fff; border:none; padding:8px 14px; border-radius:4px; cursor:pointer; font-size:11px;">✅ Check Readiness</button>
+    </div>
+    
+    <!-- Diagnostic Info (collapsible) -->
+    <details style="margin-bottom:10px;">
+      <summary style="cursor:pointer; font-size:11px; color:#888; margin-bottom:6px;">🔧 Diagnostics</summary>
+      <div id="midnight-diagnostic" style="padding:8px; background:#0a0a1e; border-radius:4px; font-size:10px;">
+        <div><strong>window.midnight:</strong> <span id="diag-midnight">?</span></div>
+        <div><strong>Provider Key:</strong> <span id="diag-provider-key">?</span></div>
+        <div><strong>Has connect():</strong> <span id="diag-connect">?</span></div>
+        <div><strong>Last Error:</strong> <span id="diag-error" style="color:#e74c3c;">None</span></div>
+      </div>
+    </details>
+    
+    <!-- Reset Permissions Panel -->
+    <details style="margin-bottom:10px; background:#2a2a4e; border-radius:4px; padding:8px;">
+      <summary style="cursor:pointer; font-weight:bold; color:#e74c3c;">⚠️ If you keep seeing "Access denied"</summary>
+      <div style="margin-top:8px; font-size:11px; line-height:1.5;">
+        <ol style="margin:0; padding-left:20px;">
+          <li>Open <strong>Lace wallet</strong> extension</li>
+          <li>Go to <strong>Settings</strong> → Enable <strong>"Midnight Preview"</strong> mode</li>
+          <li>Go to <strong>Connected Websites</strong> / <strong>DApp Permissions</strong></li>
+          <li>Remove any <strong>localhost</strong> entries</li>
+          <li><strong>Restart Chrome</strong> completely</li>
+          <li>Reload this page and click <strong>Connect</strong> again</li>
+          <li>When the popup appears, click <strong>Approve</strong></li>
+        </ol>
+        <div style="margin-top:8px; padding:5px; background:#1a1a2e; border-radius:4px;">
+          <strong>Still not working?</strong><br>
+          Try in a clean Chrome profile or Incognito with only Lace installed.
+        </div>
+      </div>
+    </details>
+    
+    <!-- Output Log -->
+    <div id="midnight-test-output" style="padding:8px; background:#0a0a1e; border-radius:4px; white-space:pre-wrap; max-height:200px; overflow-y:auto; font-size:10px;">
+Click "Detect" to check connector availability...
+    </div>
+  </div>
+  
+  <!-- Corner buttons removed - using in-game UI only -->
+
+  <!-- ============================================================ -->
+  <!-- CARDANO CIP-30 Connect Test Panel (uses window.cardano.lace) -->
+  <!-- ============================================================ -->
+  <div id="lace-test-panel" style="position:fixed; top:10px; right:10px; background:#1a1a2e; color:#eee; padding:15px; border-radius:8px; font-family:monospace; font-size:12px; max-width:400px; max-height:80vh; overflow-y:auto; z-index:9999; box-shadow:0 4px 20px rgba(0,0,0,0.5); display:none;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <strong style="font-size:14px;">� Cardano CIP-30 Test</strong>
+      <button onclick="document.getElementById('lace-test-panel').style.display='none'" style="background:none; border:none; color:#888; cursor:pointer; font-size:16px;">✕</button>
+    </div>
+    
+    <div style="margin-bottom:10px; padding:8px; background:#2a2a4e; border-radius:4px; font-size:10px;">
+      Uses: window.cardano.lace.enable()<br>
+      Standard Cardano CIP-30 wallet
+    </div>
+    
+    <div style="margin-bottom:10px;">
+      <label>Expected Network:</label>
+      <select id="lace-expected-network" style="margin-left:5px; padding:3px; background:#2a2a4e; color:#eee; border:1px solid #444; border-radius:4px;">
+        <option value="0">Mainnet (0)</option>
+        <option value="1" selected>Testnet/Preprod (1)</option>
+      </select>
+    </div>
+    
+    <div style="margin-bottom:10px;">
+      <button id="lace-connect-btn" onclick="window.LaceTest.connect()" style="background:#4a9eff; color:#fff; border:none; padding:8px 16px; border-radius:4px; cursor:pointer; margin-right:5px;">Connect Cardano</button>
+      <button onclick="window.LaceTest.disconnect()" style="background:#666; color:#fff; border:none; padding:8px 16px; border-radius:4px; cursor:pointer;">Disconnect</button>
+    </div>
+    
+    <div id="lace-test-status" style="padding:8px; background:#2a2a4e; border-radius:4px; margin-bottom:10px;">
+      Status: Not connected
+    </div>
+    
+    <div id="lace-test-output" style="padding:8px; background:#0a0a1e; border-radius:4px; white-space:pre-wrap; max-height:300px; overflow-y:auto; font-size:11px;">
+      Click "Connect Cardano" to test CIP-30 connection...
+    </div>
+  </div>
+  
+  <!-- Cardano Test button removed -->
+
+  <script>
+    // ============================================================
+    // MIDNIGHT Preview Connect Logic (HARD-GATE: mnLace only)
+    // Uses MidnightConnector as single source of truth
+    // NEVER uses window.cardano (CIP-30)
+    // ============================================================
+    window.MidnightTest = {
+      log: function(msg) {
+        var output = document.getElementById('midnight-test-output');
+        var time = new Date().toLocaleTimeString();
+        output.textContent += '[' + time + '] ' + msg + '\n';
+        output.scrollTop = output.scrollHeight;
+        console.log('[MidnightTest] ' + msg);
+      },
+      
+      setStatus: function(status, color) {
+        document.getElementById('midnight-status-text').textContent = status;
+        document.getElementById('midnight-test-status').style.borderLeftColor = color || '#888';
+      },
+      
+      updateDiagnostics: function() {
+        // Update diagnostic display
+        var midnightExists = typeof window.midnight !== 'undefined';
+        var mnLaceExists = midnightExists && window.midnight.mnLace;
+        var hasConnect = mnLaceExists && ('connect' in window.midnight.mnLace);
+        
+        document.getElementById('diag-midnight').textContent = midnightExists ? 'YES' : 'NO';
+        document.getElementById('diag-midnight').style.color = midnightExists ? '#27ae60' : '#e74c3c';
+        
+        document.getElementById('diag-mnlace').textContent = mnLaceExists ? 'YES' : 'NO';
+        document.getElementById('diag-mnlace').style.color = mnLaceExists ? '#27ae60' : '#e74c3c';
+        
+        document.getElementById('diag-connect').textContent = hasConnect ? 'YES (prototype)' : 'NO';
+        document.getElementById('diag-connect').style.color = hasConnect ? '#27ae60' : '#e74c3c';
+        
+        // Update detected/connected status
+        if (window.MidnightConnector) {
+          var state = window.MidnightConnector.getState();
+          document.getElementById('midnight-detected').textContent = 'Detected: ' + (state.detected ? 'YES' : 'NO');
+          document.getElementById('midnight-connected').textContent = 'Connected: ' + (state.connected ? 'YES' : 'NO');
+          
+          if (state.lastError) {
+            document.getElementById('diag-error').textContent = state.lastError + ': ' + (state.lastErrorMessage || '');
+          } else {
+            document.getElementById('diag-error').textContent = 'None';
+            document.getElementById('diag-error').style.color = '#27ae60';
+          }
+        }
+      },
+      
+      clear: function() {
+        document.getElementById('midnight-test-output').textContent = '';
+      },
+      
+      detect: function() {
+        this.clear();
+        this.log('Detecting Midnight Preview connector...');
+        this.log('HARD-GATE: Only checking window.midnight.mnLace');
+        this.log('');
+        
+        // Use MidnightConnector if available
+        if (window.MidnightConnector) {
+          var info = window.MidnightConnector.detectMidnightPreview();
+          this.log('Detection result:');
+          this.log('  exists: ' + info.exists);
+          this.log('  name: ' + info.name);
+          this.log('  apiVersion: ' + info.apiVersion);
+          this.log('  hasConnect: ' + info.hasConnect);
+          this.log('  connectLocation: ' + info.connectLocation);
+          this.log('  hasEnable: ' + info.hasEnable);
+          
+          if (info.exists && info.hasConnect) {
+            this.setStatus('Connector detected - ready to connect', '#27ae60');
+          } else if (info.exists) {
+            this.setStatus('mnLace found but no connect()', '#f39c12');
+          } else {
+            this.setStatus('Connector not found', '#e74c3c');
+          }
+        } else {
+          // Fallback to manual check
+          this.log('MidnightConnector not loaded, using manual check...');
+          var midnightExists = typeof window.midnight !== 'undefined';
+          var mnLaceExists = midnightExists && window.midnight.mnLace;
+          var hasConnect = mnLaceExists && ('connect' in window.midnight.mnLace);
+          
+          this.log('  window.midnight: ' + (midnightExists ? 'EXISTS' : 'NOT FOUND'));
+          this.log('  window.midnight.mnLace: ' + (mnLaceExists ? 'EXISTS' : 'NOT FOUND'));
+          this.log('  connect in mnLace: ' + hasConnect);
+          
+          if (hasConnect) {
+            this.setStatus('Connector detected', '#27ae60');
+          } else {
+            this.setStatus('Connector not found', '#e74c3c');
+          }
+        }
+        
+        this.updateDiagnostics();
+      },
+      
+      connect: async function() {
+        this.clear();
+        var net = (window.MidnightConfig && window.MidnightConfig.network) || 'auto';
+        this.setStatus('Connecting (' + net + ')...', '#f39c12');
+        this.log('Starting Midnight ' + net + ' connection...');
+        this.log('HARD-GATE: Using ONLY window.midnight.mnLace');
+        this.log('NOT Cardano CIP-30 (window.cardano)');
+        this.log('');
+        
+        // Use MidnightConnector (single source of truth)
+        if (window.MidnightConnector) {
+          try {
+            this.log('Calling MidnightConnector.connectMidnightPreview("' + net + '")...');
+            var result = await window.MidnightConnector.connectMidnightPreview(net);
+            
+            if (result.success) {
+              this.log('');
+              this.log('SUCCESS!');
+              if (result.walletInfo) {
+                this.log('Wallet: ' + result.walletInfo.name + ' v' + result.walletInfo.apiVersion);
+                this.log('Network: ' + result.walletInfo.network);
+              }
+              if (result.api) {
+                try {
+                  this.log('API keys: ' + Object.keys(result.api).join(', '));
+                } catch (e) {
+                  this.log('API keys: (could not enumerate)');
+                }
+              }
+              this.setStatus('Connected to Midnight ' + net, '#27ae60');
+              
+              // Check contract readiness
+              this.log('');
+              this.log('Checking contract readiness...');
+              if (window.MidnightSDK && window.MidnightSDK.checkContractReadiness) {
+                var readiness = await window.MidnightSDK.checkContractReadiness();
+                this.log('Ready: ' + readiness.ready);
+                if (readiness.errors.length > 0) {
+                  this.log('Errors: ' + readiness.errors.join(', '));
+                }
+                if (readiness.instructions.length > 0) {
+                  this.log('Instructions: ' + readiness.instructions.join(', '));
+                }
+              }
+            } else {
+              this.log('');
+              this.log('FAILED: ' + result.error);
+              this.log('Message: ' + result.errorMessage);
+              this.setStatus('Connection failed: ' + result.error, '#e74c3c');
+            }
+          } catch (e) {
+            this.log('ERROR: ' + e.message);
+            this.setStatus('Error: ' + e.message, '#e74c3c');
+          }
+        } else if (window.MidnightSDK) {
+          // Fallback to MidnightSDK.connectMidnightPreview
+          try {
+            this.log('Using MidnightSDK.connectMidnightPreview("' + net + '")...');
+            var result = await window.MidnightSDK.connectMidnightPreview(net);
+            if (result.success) {
+              this.log('SUCCESS!');
+              this.setStatus('Connected', '#27ae60');
+            } else {
+              this.log('FAILED: ' + result.errorMessage);
+              this.setStatus('Failed', '#e74c3c');
+            }
+          } catch (e) {
+            this.log('ERROR: ' + e.message);
+            this.setStatus('Error', '#e74c3c');
+          }
+        } else {
+          this.log('ERROR: MidnightConnector not loaded');
+          this.setStatus('SDK not loaded', '#e74c3c');
+        }
+        
+        this.updateDiagnostics();
+      },
+      
+      disconnect: function() {
+        this.clear();
+        this.log('Disconnecting...');
+        
+        if (window.MidnightConnector) {
+          window.MidnightConnector.disconnect();
+          this.log('Disconnected');
+          this.setStatus('Disconnected', '#888');
+        } else {
+          this.log('MidnightConnector not loaded');
+        }
+        
+        this.updateDiagnostics();
+      },
+      
+      checkReadiness: async function() {
+        this.clear();
+        this.log('Checking contract readiness...');
+        
+        if (window.MidnightSDK && window.MidnightSDK.checkContractReadiness) {
+          var result = await window.MidnightSDK.checkContractReadiness();
+          this.log('');
+          this.log('Ready: ' + result.ready);
+          this.log('Wallet connected: ' + result.walletConnected);
+          this.log('Packages loaded: ' + result.packagesLoaded);
+          this.log('Counter bindings: ' + result.counterBindingsAvailable);
+          
+          if (result.errors.length > 0) {
+            this.log('');
+            this.log('Errors:');
+            result.errors.forEach(function(e) { window.MidnightTest.log('  - ' + e); });
+          }
+          
+          if (result.instructions.length > 0) {
+            this.log('');
+            this.log('Instructions:');
+            result.instructions.forEach(function(i) { window.MidnightTest.log('  - ' + i); });
+          }
+          
+          if (result.ready) {
+            this.setStatus('Ready for contracts', '#27ae60');
+          } else {
+            this.setStatus('Not ready', '#f39c12');
+          }
+        } else {
+          this.log('MidnightSDK.checkContractReadiness not available');
+          this.setStatus('SDK not loaded', '#e74c3c');
+        }
+        
+        this.updateDiagnostics();
+      }
+    };
+    
+    // Auto-update diagnostics on load
+    setTimeout(function() {
+      if (window.MidnightTest) {
+        window.MidnightTest.updateDiagnostics();
+      }
+    }, 1000);
+    
+    // ============================================================
+    // CARDANO CIP-30 Connect Test Logic (uses window.cardano.lace)
+    // ============================================================
+    window.LaceTest = {
+      api: null,
+      wallet: null,
+      
+      log: function(msg) {
+        var output = document.getElementById('lace-test-output');
+        var time = new Date().toLocaleTimeString();
+        output.textContent += '[' + time + '] ' + msg + '\n';
+        output.scrollTop = output.scrollHeight;
+        console.log('[CardanoTest] ' + msg);
+      },
+      
+      setStatus: function(status, color) {
+        var el = document.getElementById('lace-test-status');
+        el.textContent = 'Status: ' + status;
+        el.style.borderLeft = '3px solid ' + (color || '#888');
+      },
+      
+      clear: function() {
+        document.getElementById('lace-test-output').textContent = '';
+      },
+      
+      connect: async function() {
+        this.clear();
+        this.setStatus('Connecting...', '#ffaa00');
+        
+        try {
+          // Check if Lace is available
+          if (!window.cardano || !window.cardano.lace) {
+            this.log('ERROR: window.cardano.lace not found');
+            this.log('Available wallets: ' + (window.cardano ? Object.keys(window.cardano).join(', ') : 'none'));
+            this.setStatus('Lace not found', '#ff4444');
+            return;
+          }
+          
+          this.wallet = window.cardano.lace;
+          this.log('Found Lace wallet');
+          this.log('  apiVersion: ' + (this.wallet.apiVersion || 'unknown'));
+          this.log('  name: ' + (this.wallet.name || 'unknown'));
+          this.log('  icon: ' + (this.wallet.icon ? 'present' : 'missing'));
+          
+          // Log supported extensions if available
+          if (this.wallet.supportedExtensions) {
+            this.log('  supportedExtensions: ' + JSON.stringify(this.wallet.supportedExtensions));
+          }
+          
+          // Enable the wallet
+          this.log('Calling lace.enable()...');
+          this.api = await this.wallet.enable();
+          this.log('Wallet enabled successfully!');
+          this.log('API methods: ' + Object.keys(this.api).join(', '));
+          
+          // Get network ID
+          this.log('--- Network Check ---');
+          var networkId = await this.api.getNetworkId();
+          var expectedNetwork = parseInt(document.getElementById('lace-expected-network').value);
+          var networkNames = { 0: 'Mainnet', 1: 'Testnet/Preprod' };
+          
+          this.log('Network ID: ' + networkId + ' (' + (networkNames[networkId] || 'unknown') + ')');
+          this.log('Expected: ' + expectedNetwork + ' (' + (networkNames[expectedNetwork] || 'unknown') + ')');
+          
+          if (networkId !== expectedNetwork) {
+            this.log('⚠️ NETWORK MISMATCH! Please switch Lace to ' + (networkNames[expectedNetwork] || 'network ' + expectedNetwork));
+            this.setStatus('Connected (WRONG NETWORK)', '#ffaa00');
+          } else {
+            this.log('✓ Network matches expected');
+            this.setStatus('Connected (' + (networkNames[networkId] || networkId) + ')', '#44ff44');
+          }
+          
+          // Get addresses
+          this.log('--- Addresses ---');
+          try {
+            var changeAddr = await this.api.getChangeAddress();
+            this.log('Change address: ' + changeAddr.substring(0, 20) + '...');
+          } catch (e) {
+            this.log('getChangeAddress failed: ' + e.message);
+          }
+          
+          try {
+            var usedAddrs = await this.api.getUsedAddresses();
+            this.log('Used addresses: ' + usedAddrs.length);
+            if (usedAddrs.length > 0) {
+              this.log('  First: ' + usedAddrs[0].substring(0, 20) + '...');
+            }
+          } catch (e) {
+            this.log('getUsedAddresses failed: ' + e.message);
+          }
+          
+          try {
+            var unusedAddrs = await this.api.getUnusedAddresses();
+            this.log('Unused addresses: ' + unusedAddrs.length);
+          } catch (e) {
+            this.log('getUnusedAddresses failed: ' + e.message);
+          }
+          
+          // Get UTXOs (optional, can be slow)
+          this.log('--- UTXOs ---');
+          try {
+            var utxos = await this.api.getUtxos();
+            this.log('UTXOs: ' + (utxos ? utxos.length : 0));
+            if (utxos && utxos.length > 0) {
+              this.log('  First UTXO (hex): ' + utxos[0].substring(0, 40) + '...');
+            }
+          } catch (e) {
+            this.log('getUtxos failed: ' + e.message);
+          }
+          
+          // Get balance
+          this.log('--- Balance ---');
+          try {
+            var balance = await this.api.getBalance();
+            this.log('Balance (CBOR hex): ' + balance.substring(0, 40) + '...');
+          } catch (e) {
+            this.log('getBalance failed: ' + e.message);
+          }
+          
+          this.log('--- Done ---');
+          
+        } catch (e) {
+          this.log('ERROR: ' + e.message);
+          if (e.stack) this.log('Stack: ' + e.stack.split('\n').slice(0, 3).join('\n'));
+          this.setStatus('Error: ' + e.message, '#ff4444');
+          
+          // Full debug dump on error
+          this.log('--- Debug Dump ---');
+          this.log('window.cardano keys: ' + (window.cardano ? Object.keys(window.cardano).join(', ') : 'undefined'));
+          if (this.wallet) {
+            this.log('wallet keys: ' + Object.keys(this.wallet).join(', '));
+            this.log('wallet.apiVersion: ' + this.wallet.apiVersion);
+            this.log('wallet.supportedExtensions: ' + JSON.stringify(this.wallet.supportedExtensions || null));
+          }
+          if (this.api) {
+            this.log('api keys: ' + Object.keys(this.api).join(', '));
+          }
+        }
+      },
+      
+      disconnect: function() {
+        this.api = null;
+        this.wallet = null;
+        this.setStatus('Disconnected', '#888');
+        this.log('Disconnected');
+      }
+    };
+  </script>
+
   <script>
     var container = document.querySelector("#unity-container");
     var canvas = document.querySelector("#unity-canvas");

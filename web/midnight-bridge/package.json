@@ -1,0 +1,38 @@
+{
+  "name": "midnight-unity-bridge",
+  "version": "2.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "build:copy": "node build.mjs && node scripts/copy-to-unity.js",
+    "copy": "node scripts/copy-to-unity.js"
+  },
+  "dependencies": {
+    "@meshsdk/midnight-setup": "^1.9.0-beta.98",
+    "@midnight-ntwrk/compact-runtime": "0.15.0",
+    "@midnight-ntwrk/counter-contract": "file:vendor/counter-contract",
+    "@midnight-ntwrk/dapp-connector-api": "4.0.1",
+    "@midnight-ntwrk/ledger-v8": "8.0.3",
+    "@midnight-ntwrk/midnight-js-contracts": "^4.0.4",
+    "@midnight-ntwrk/midnight-js-fetch-zk-config-provider": "^4.0.4",
+    "@midnight-ntwrk/midnight-js-http-client-proof-provider": "^4.0.4",
+    "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "^4.0.4",
+    "@midnight-ntwrk/midnight-js-level-private-state-provider": "^4.0.4",
+    "@midnight-ntwrk/midnight-js-network-id": "^4.0.4",
+    "@midnight-ntwrk/midnight-js-types": "^4.0.4",
+    "@midnight-ntwrk/wallet-sdk-address-format": "3.1.1",
+    "buffer": "^6.0.3",
+    "crypto-browserify": "^3.12.1",
+    "events": "^3.3.0",
+    "stream-browserify": "^3.0.0"
+  },
+  "overrides": {
+    "@midnight-ntwrk/wallet-sdk-address-format": "3.1.1",
+    "@midnight-ntwrk/ledger-v8": "8.0.3",
+    "@midnight-ntwrk/compact-runtime": "0.15.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.2",
+    "typescript": "^5.5.0"
+  }
+}

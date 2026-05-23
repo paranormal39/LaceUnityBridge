@@ -254,11 +254,23 @@
    * Check if SDK is available and expose the appropriate implementation.
    */
   function createMidnightCounter() {
-    // Check if the full SDK is available
-    var sdkAvailable =
-      typeof window.MidnightSDK !== "undefined" &&
-      typeof window.MidnightSDK.Counter !== "undefined" &&
-      typeof window.MidnightSDK.indexerPublicDataProvider === "function";
+    // Check if the SDK bundle is loaded at all
+    var sdkLoaded = typeof window.MidnightSDK !== "undefined";
+    // Check if the indexer provider (core SDK) is available
+    // NOTE: indexerPublicDataProvider starts as null and gets set after WASM packages load
+    var hasIndexer = sdkLoaded && typeof window.MidnightSDK.indexerPublicDataProvider === "function";
+    // Check if the counter contract bindings are available (requires compiled Compact contract)
+    var hasCounter = sdkLoaded && window.MidnightSDK.Counter != null;
+    // Check if WASM packages are still loading
+    var pkgsStillLoading = sdkLoaded && !hasIndexer && typeof window.MidnightSDK.midnightPkgsLoaded === "function" && !window.MidnightSDK.midnightPkgsLoaded();
+    // Full SDK = indexer + counter contract
+    var sdkAvailable = hasIndexer && hasCounter;
+
+    console.log("[MidnightCounter] SDK loaded:", sdkLoaded);
+    console.log("[MidnightCounter] indexerPublicDataProvider:", hasIndexer);
+    console.log("[MidnightCounter] Counter contract:", hasCounter);
+    console.log("[MidnightCounter] findDeployedContract:", sdkLoaded && typeof window.MidnightSDK.findDeployedContract === "function");
+    if (pkgsStillLoading) console.log("[MidnightCounter] @midnight-ntwrk packages still loading (WASM init in progress)...");
 
     if (sdkAvailable) {
       console.log("[MidnightCounter] Full SDK detected, using real implementation");
@@ -266,6 +278,19 @@
         buildIncrementTransaction: buildIncrementTransaction,
         getCount: getCount,
         _sdkAvailable: true,
+        _sdkLoaded: true,
+      };
+    } else if (hasIndexer) {
+      console.log(
+        "[MidnightCounter] SDK loaded with indexer but no Counter contract bindings. " +
+          "getCount/buildIncrementTransaction will fail until Counter contract is compiled and exposed. " +
+          "The SDK connector (window.MidnightSDK.connect) is still usable."
+      );
+      return {
+        buildIncrementTransaction: MidnightCounterStub.buildIncrementTransaction,
+        getCount: MidnightCounterStub.getCount,
+        _sdkAvailable: false,
+        _sdkLoaded: true,
       };
     } else {
       console.warn(
@@ -276,6 +301,7 @@
         buildIncrementTransaction: MidnightCounterStub.buildIncrementTransaction,
         getCount: MidnightCounterStub.getCount,
         _sdkAvailable: false,
+        _sdkLoaded: false,
       };
     }
   }
@@ -284,11 +310,57 @@
   global.MidnightCounter = createMidnightCounter();
 
   // Allow re-initialization if SDK is loaded later
-  global.MidnightCounter.reinitialize = function () {
+  function reinitializeMidnightCounter() {
     global.MidnightCounter = createMidnightCounter();
-    global.MidnightCounter.reinitialize = arguments.callee;
-    console.log("[MidnightCounter] Reinitialized. SDK available:", global.MidnightCounter._sdkAvailable);
-  };
+    global.MidnightCounter.reinitialize = reinitializeMidnightCounter;
+    console.log("[MidnightCounter] Reinitialized. SDK loaded:", global.MidnightCounter._sdkLoaded, "| Full SDK available:", global.MidnightCounter._sdkAvailable);
+  }
+  global.MidnightCounter.reinitialize = reinitializeMidnightCounter;
 
-  console.log("[MidnightCounter] Bindings loaded. SDK available:", global.MidnightCounter._sdkAvailable);
+  console.log("[MidnightCounter] Bindings loaded. SDK loaded:", global.MidnightCounter._sdkLoaded, "| Full SDK available:", global.MidnightCounter._sdkAvailable);
+
+  // Auto-reinitialize after MidnightSDK finishes loading WASM packages.
+  // Use whenReady Promise if available (preferred), otherwise fall back to MidnightSDKReadyPromise.
+  function waitForSDKAndReinit() {
+    var sdk = window.MidnightSDK;
+    if (!sdk) {
+      console.log("[MidnightCounter] No MidnightSDK found, skipping auto-reinit");
+      return;
+    }
+
+    // Prefer whenReady (resolves after package loading attempt)
+    var readyPromise = sdk.whenReady || window.MidnightSDKReadyPromise;
+    
+    if (readyPromise && typeof readyPromise.then === "function") {
+      readyPromise.then(function () {
+        console.log("[MidnightCounter] SDK ready signal received");
+        console.log("[MidnightCounter] MidnightSDKFullReady:", window.MidnightSDKFullReady);
+        console.log("[MidnightCounter] MidnightSDKError:", window.MidnightSDKError);
+        
+        // Check if packages actually loaded successfully
+        var hasIndexer = typeof sdk.indexerPublicDataProvider === "function";
+        console.log("[MidnightCounter] indexerPublicDataProvider available:", hasIndexer);
+        
+        if (hasIndexer && !global.MidnightCounter._sdkAvailable) {
+          console.log("[MidnightCounter] Packages loaded, reinitializing...");
+          global.MidnightCounter.reinitialize();
+        } else if (!hasIndexer) {
+          console.log("[MidnightCounter] Packages failed to load, staying in stub mode");
+        }
+      }).catch(function (err) {
+        console.warn("[MidnightCounter] SDK ready promise rejected:", err);
+      });
+    } else {
+      // No promise available — try reinit after a delay
+      console.log("[MidnightCounter] No ready promise, will retry in 3s");
+      setTimeout(function () {
+        if (typeof sdk.indexerPublicDataProvider === "function" && !global.MidnightCounter._sdkAvailable) {
+          console.log("[MidnightCounter] Delayed reinitialize");
+          global.MidnightCounter.reinitialize();
+        }
+      }, 3000);
+    }
+  }
+
+  waitForSDKAndReinit();
 })(typeof window !== "undefined" ? window : this);

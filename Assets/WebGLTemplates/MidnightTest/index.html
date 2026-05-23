@@ -23,6 +23,7 @@
     <button onclick="checkWallet()">Check Wallet Now</button>
     <button onclick="checkDelayed()">Check After 3s Delay</button>
     <button onclick="tryConnect()">Try Connect</button>
+    <button onclick="debugMidnightConnection()" style="background:#7b68ee;color:#fff;">Debug Midnight Connection</button>
     
     <h3>Console Output</h3>
     <pre id="log"></pre>
@@ -42,56 +43,123 @@
         function checkWallet() {
             log('\n=== Checking wallet ===');
             log('Time: ' + new Date().toISOString());
-            
-            // Check window.midnight
-            log('window.midnight: ' + (window.midnight ? 'EXISTS' : 'not present'));
-            if (window.midnight) {
-                log('  typeof: ' + typeof window.midnight);
-                log('  keys: ' + Object.keys(window.midnight).join(', '));
-                
-                if (typeof window.midnight.enable === 'function') {
-                    log('  HAS enable() - direct connector!');
-                    setStatus('Found: window.midnight (direct connector)', true);
-                    return;
+
+            // ---- Explicit DApp connector path checks ----
+            log('\n--- Explicit connector path checks ---');
+            var explicitPaths = [
+                { path: 'window.midnight',            get: function() { return window.midnight; } },
+                { path: 'window.midnight.mnLace',     get: function() { return window.midnight && window.midnight.mnLace; } },
+                { path: 'window.midnight.lace',       get: function() { return window.midnight && window.midnight.lace; } },
+                { path: 'window.midnight.Lace',       get: function() { return window.midnight && window.midnight.Lace; } },
+                { path: 'window.midnight.midnight',   get: function() { return window.midnight && window.midnight.midnight; } },
+                { path: 'window.midnight.MnLace',     get: function() { return window.midnight && window.midnight.MnLace; } },
+                { path: 'window.midnight.mn_lace',    get: function() { return window.midnight && window.midnight.mn_lace; } },
+                { path: 'window.cardano',             get: function() { return window.cardano; } },
+                { path: 'window.cardano.lace',        get: function() { return window.cardano && window.cardano.lace; } },
+                { path: 'window.cardano.midnight',    get: function() { return window.cardano && window.cardano.midnight; } },
+                { path: 'window.cardano.mnLace',      get: function() { return window.cardano && window.cardano.mnLace; } },
+                { path: 'window.cardano.nami',        get: function() { return window.cardano && window.cardano.nami; } },
+                { path: 'window.lace',                get: function() { return window.lace; } },
+                { path: 'window.mnLace',              get: function() { return window.mnLace; } }
+            ];
+
+            var foundConnector = null;
+            for (var p = 0; p < explicitPaths.length; p++) {
+                var entry = explicitPaths[p];
+                try {
+                    var obj = entry.get();
+                    if (obj) {
+                        var t = typeof obj;
+                        var info = entry.path + ' = EXISTS (' + t + ')';
+                        if (t === 'object') {
+                            var objKeys = Object.keys(obj);
+                            info += ' keys=[' + objKeys.join(', ') + ']';
+                            if (typeof obj.enable === 'function') { info += ' [HAS enable() - DAPP CONNECTOR]'; foundConnector = entry.path; }
+                            if (typeof obj.isEnabled === 'function') info += ' [HAS isEnabled()]';
+                            if (obj.name) info += ' name=' + obj.name;
+                            if (obj.apiVersion) info += ' apiVersion=' + obj.apiVersion;
+                        } else if (t === 'function') {
+                            info += ' [is a function]';
+                        }
+                        log('CHECK: ' + info);
+                    } else {
+                        log('CHECK: ' + entry.path + ' = NOT PRESENT');
+                    }
+                } catch (err) {
+                    log('CHECK: ' + entry.path + ' = ERROR: ' + err.message);
                 }
-                
-                // Check sub-keys
-                Object.keys(window.midnight).forEach(function(key) {
+            }
+
+            // ---- Deep enumerate window.midnight ----
+            log('\n--- Deep enumerate window.midnight ---');
+            if (window.midnight) {
+                log('window.midnight EXISTS, typeof: ' + typeof window.midnight);
+                var keys = Object.keys(window.midnight);
+                log('  keys: ' + keys.join(', '));
+                try {
+                    var allProps = Object.getOwnPropertyNames(window.midnight);
+                    if (allProps.length !== keys.length) log('  getOwnPropertyNames: ' + allProps.join(', '));
+                } catch(e) {}
+
+                keys.forEach(function(key) {
                     var val = window.midnight[key];
                     if (val && typeof val === 'object') {
-                        log('  .' + key + ': ' + Object.keys(val).join(', '));
-                        if (typeof val.enable === 'function') {
-                            log('    ^ HAS enable() - wallet connector!');
-                            setStatus('Found: window.midnight.' + key, true);
-                        }
+                        var subKeys = Object.keys(val);
+                        log('  .' + key + ' = [object] keys=[' + subKeys.join(', ') + ']');
+                        if (typeof val.enable === 'function') log('    ^ HAS enable() - wallet connector!');
+                        if (typeof val.isEnabled === 'function') log('    ^ HAS isEnabled()');
+                        if (val.name) log('    ^ name: ' + val.name);
+                        if (val.apiVersion) log('    ^ apiVersion: ' + val.apiVersion);
+                        // One more level deep
+                        subKeys.forEach(function(sk) {
+                            var sv = val[sk];
+                            if (sv && typeof sv === 'object') {
+                                log('    .' + key + '.' + sk + ' = [object] keys=[' + Object.keys(sv).join(', ') + ']');
+                                if (typeof sv.enable === 'function') log('      ^ HAS enable() - NESTED connector!');
+                            }
+                        });
+                    } else if (typeof val === 'function') {
+                        log('  .' + key + ' = [function]');
+                    } else {
+                        log('  .' + key + ' = ' + val);
                     }
                 });
+            } else {
+                log('window.midnight is NOT present');
             }
-            
-            // Check window.cardano
-            log('window.cardano: ' + (window.cardano ? 'EXISTS' : 'not present'));
+
+            // ---- Deep enumerate window.cardano ----
+            log('\n--- Deep enumerate window.cardano ---');
             if (window.cardano) {
-                log('  keys: ' + Object.keys(window.cardano).join(', '));
-                
-                Object.keys(window.cardano).forEach(function(key) {
+                var cardanoKeys = Object.keys(window.cardano);
+                log('window.cardano EXISTS, keys: ' + cardanoKeys.join(', '));
+                cardanoKeys.forEach(function(key) {
                     var val = window.cardano[key];
-                    if (val && typeof val === 'object' && typeof val.enable === 'function') {
-                        log('  .' + key + ': HAS enable() - wallet connector!');
-                        if (val.name) log('    name: ' + val.name);
+                    if (val && typeof val === 'object') {
+                        log('  .' + key + ' = [object] keys=[' + Object.keys(val).join(', ') + ']');
+                        if (typeof val.enable === 'function') log('    ^ HAS enable() - wallet connector!');
+                        if (typeof val.isEnabled === 'function') log('    ^ HAS isEnabled()');
+                        if (val.name) log('    ^ name: ' + val.name);
+                        if (val.apiVersion) log('    ^ apiVersion: ' + val.apiVersion);
+                    } else if (typeof val === 'function') {
+                        log('  .' + key + ' = [function]');
                     }
                 });
-                
-                if (window.cardano.midnight) {
-                    setStatus('Found: window.cardano.midnight', true);
-                    return;
-                }
-                if (window.cardano.lace) {
-                    setStatus('Found: window.cardano.lace', true);
-                    return;
-                }
+            } else {
+                log('window.cardano is NOT present');
             }
-            
-            if (!window.midnight && !window.cardano) {
+
+            // ---- Other globals ----
+            log('\n--- Other global checks ---');
+            if (window.lace) log('window.lace EXISTS, keys: ' + Object.keys(window.lace).join(', '));
+            else log('window.lace: NOT present');
+            if (window.mnLace) log('window.mnLace EXISTS, keys: ' + Object.keys(window.mnLace).join(', '));
+            else log('window.mnLace: NOT present');
+
+            // ---- Summary ----
+            if (foundConnector) {
+                setStatus('FOUND connector at: ' + foundConnector, true);
+            } else if (!window.midnight && !window.cardano) {
                 setStatus('NOT FOUND: Neither window.midnight nor window.cardano exist', false);
                 log('\n*** WALLET NOT DETECTED ***');
                 log('Possible causes:');
@@ -99,6 +167,8 @@
                 log('2. Extension not enabled for this site');
                 log('3. Page loaded before extension injected (try refresh)');
                 log('4. Running on file:// URL (must use http:// or https://)');
+            } else {
+                setStatus('Objects exist but no enable() connector found', false);
             }
         }
 
@@ -175,6 +245,288 @@
                 log('ERROR: ' + err.message);
                 setStatus('Connection error: ' + err.message, false);
             }
+        }
+
+        async function debugMidnightConnection() {
+            document.getElementById('log').textContent = '';
+            log('============================================');
+            log('=== MIDNIGHT CONNECTION DEBUG ===');
+            log('Time: ' + new Date().toISOString());
+            log('URL: ' + window.location.href);
+            log('Protocol: ' + window.location.protocol);
+            log('============================================');
+
+            // Step 1: Check window.midnight
+            log('\n[STEP 1] Checking window.midnight...');
+            if (!window.midnight) {
+                log('❌ window.midnight does NOT exist');
+                log('   Possible causes:');
+                log('   1. Lace Midnight Preview extension not installed');
+                log('   2. Extension disabled or not enabled for this site');
+                log('   3. Page loaded before extension injected (try waiting/refreshing)');
+                log('   4. Running on file:// URL (must use http:// or https://)');
+                log('   5. Extension only injects on specific origins');
+                if (window.location.protocol === 'file:') {
+                    log('   ⚠️  You ARE on file:// - extensions cannot inject here!');
+                }
+                if (window.MidnightSDK) {
+                    log('   ℹ️  window.MidnightSDK bundle IS loaded');
+                    log('   ℹ️  Bundle connectorAvailable: ' + window.MidnightSDK.isConnectorAvailable());
+                }
+                setStatus('window.midnight not found', false);
+                log('=== END (no window.midnight) ===');
+                return;
+            }
+
+            log('✅ window.midnight EXISTS, typeof: ' + typeof window.midnight);
+
+            // Step 2: Enumerate keys
+            log('\n[STEP 2] Enumerating window.midnight keys...');
+            var keys = [];
+            try {
+                keys = Object.keys(window.midnight);
+                log('   Object.keys: ' + JSON.stringify(keys));
+            } catch (e) {
+                log('   ❌ Object.keys failed: ' + e.message);
+            }
+            try {
+                var allProps = Object.getOwnPropertyNames(window.midnight);
+                if (allProps.length !== keys.length) {
+                    log('   getOwnPropertyNames: ' + JSON.stringify(allProps));
+                    log('   ⚠️  Non-enumerable properties detected!');
+                }
+            } catch (e) {}
+
+            if (typeof window.midnight.enable === 'function') {
+                log('   ⚡ window.midnight itself has enable() - it IS a connector!');
+            }
+
+            // Step 3: Find connectors
+            log('\n[STEP 3] Scanning for connectors (objects with enable())...');
+            var connectors = [];
+
+            if (typeof window.midnight.enable === 'function') {
+                connectors.push({ path: 'window.midnight', obj: window.midnight });
+            }
+
+            for (var i = 0; i < keys.length; i++) {
+                var key = keys[i];
+                try {
+                    var val = window.midnight[key];
+                    var vtype = typeof val;
+                    if (val && vtype === 'object') {
+                        var subKeys = Object.keys(val);
+                        log('   .' + key + ' = [object] keys=[' + subKeys.join(', ') + ']');
+                        if (typeof val.enable === 'function') {
+                            log('     ⚡ HAS enable() - THIS IS A CONNECTOR');
+                            connectors.push({ path: 'window.midnight.' + key, obj: val });
+                        }
+                        if (typeof val.isEnabled === 'function') log('     ✓ has isEnabled()');
+                        if (typeof val.serviceUriConfig === 'function') log('     ✓ has serviceUriConfig()');
+                        if (val.name) log('     name: ' + val.name);
+                        if (val.apiVersion) log('     apiVersion: ' + val.apiVersion);
+
+                        for (var si = 0; si < subKeys.length; si++) {
+                            try {
+                                var subVal = val[subKeys[si]];
+                                if (subVal && typeof subVal === 'object' && typeof subVal.enable === 'function') {
+                                    log('     .' + key + '.' + subKeys[si] + ' ⚡ NESTED CONNECTOR');
+                                    connectors.push({ path: 'window.midnight.' + key + '.' + subKeys[si], obj: subVal });
+                                }
+                            } catch (e) {}
+                        }
+                    } else if (vtype === 'function') {
+                        log('   .' + key + ' = [function]');
+                    } else {
+                        log('   .' + key + ' = ' + String(val) + ' (' + vtype + ')');
+                    }
+                } catch (e) {
+                    log('   .' + key + ' = ERROR: ' + e.message);
+                }
+            }
+
+            if (connectors.length === 0) {
+                log('   ❌ NO connectors found (no objects with enable())');
+                log('   Extension may still be initializing - try again in a few seconds.');
+                setStatus('window.midnight exists but no connector found', false);
+                log('=== END (no connectors) ===');
+                return;
+            }
+
+            log('   Found ' + connectors.length + ' connector(s):');
+            for (var c = 0; c < connectors.length; c++) {
+                log('     [' + c + '] ' + connectors[c].path);
+            }
+
+            // Step 4: Inspect primary connector
+            var primary = connectors[0];
+            log('\n[STEP 4] Inspecting primary connector: ' + primary.path);
+            var conn = primary.obj;
+
+            var methods = ['enable', 'isEnabled', 'state', 'serviceUriConfig', 'balanceAndProveTransaction', 'submitTransaction', 'name', 'apiVersion', 'icon'];
+            for (var m = 0; m < methods.length; m++) {
+                var mname = methods[m];
+                try {
+                    var mval = conn[mname];
+                    if (typeof mval === 'function') {
+                        log('   ✓ ' + mname + '() = [function]');
+                    } else if (mval !== undefined) {
+                        log('   ✓ ' + mname + ' = ' + String(mval));
+                    } else {
+                        log('   ✗ ' + mname + ' = undefined');
+                    }
+                } catch (e) {
+                    log('   ✗ ' + mname + ' = ERROR: ' + e.message);
+                }
+            }
+
+            // Step 5: Try isEnabled()
+            log('\n[STEP 5] Calling isEnabled() on ' + primary.path + '...');
+            try {
+                if (typeof conn.isEnabled === 'function') {
+                    var enabled = await conn.isEnabled();
+                    log('   isEnabled() returned: ' + enabled);
+                    if (enabled) {
+                        log('   ✅ Already authorized for this site!');
+                    } else {
+                        log('   ℹ️  Not yet authorized - enable() will prompt user');
+                    }
+                } else {
+                    log('   ⚠️  No isEnabled() method');
+                }
+            } catch (e) {
+                log('   ❌ isEnabled() error: ' + e.message);
+            }
+
+            // Step 6: Try enable()
+            log('\n[STEP 6] Calling enable() on ' + primary.path + '...');
+            log('   (This may trigger a wallet popup for user approval)');
+            var api = null;
+            try {
+                api = await conn.enable();
+                if (!api) {
+                    log('   ❌ enable() returned null/undefined');
+                    setStatus('enable() returned null', false);
+                    log('=== END (enable failed) ===');
+                    return;
+                }
+                log('   ✅ enable() succeeded!');
+                log('   API typeof: ' + typeof api);
+                var apiKeys = Object.keys(api);
+                log('   API keys: ' + JSON.stringify(apiKeys));
+            } catch (err) {
+                var errMsg = err.message || String(err);
+                log('   ❌ enable() error: ' + errMsg);
+                if (errMsg.toLowerCase().match(/reject|decline|deny|cancel/)) {
+                    log('   → User REJECTED the connection');
+                }
+                setStatus('enable() failed: ' + errMsg, false);
+                log('=== END (enable error) ===');
+                return;
+            }
+
+            // Step 7: Inspect API
+            log('\n[STEP 7] Inspecting returned API object...');
+            var apiMethods = ['state', 'balanceAndProveTransaction', 'submitTransaction', 'serviceUriConfig',
+                              'getUsedAddresses', 'getChangeAddress', 'getBalance', 'getUtxos', 'signTx', 'submitTx', 'signData', 'getNetworkId'];
+            for (var am = 0; am < apiMethods.length; am++) {
+                try {
+                    if (typeof api[apiMethods[am]] === 'function') {
+                        log('   ✓ api.' + apiMethods[am] + '()');
+                    }
+                } catch (e) {}
+            }
+
+            var isMidnightAPI = typeof api.state === 'function';
+            var isCardanoAPI = typeof api.getUsedAddresses === 'function';
+            log('   Is Midnight API (has state()): ' + isMidnightAPI);
+            log('   Is Cardano CIP-30 API (has getUsedAddresses()): ' + isCardanoAPI);
+
+            // Step 8: Try state()
+            if (isMidnightAPI) {
+                log('\n[STEP 8] Calling api.state() (Midnight API)...');
+                try {
+                    var walletState = await api.state();
+                    log('   ✅ state() returned!');
+                    if (walletState) {
+                        var stateKeys = Object.keys(walletState);
+                        log('   keys: ' + JSON.stringify(stateKeys));
+                        for (var sk = 0; sk < stateKeys.length; sk++) {
+                            var skey = stateKeys[sk];
+                            var sval = walletState[skey];
+                            var stype = typeof sval;
+                            if (stype === 'object' && sval !== null) {
+                                log('   .' + skey + ' = [object] keys=[' + Object.keys(sval).join(', ') + ']');
+                            } else if (stype === 'string' && sval.length > 80) {
+                                log('   .' + skey + ' = "' + sval.substring(0, 40) + '...' + sval.substring(sval.length - 20) + '" (len=' + sval.length + ')');
+                            } else {
+                                log('   .' + skey + ' = ' + String(sval) + ' (' + stype + ')');
+                            }
+                        }
+                        if (walletState.address) log('   📍 ADDRESS: ' + walletState.address);
+                        if (walletState.coinPublicKey) log('   🔑 COIN PUBLIC KEY: ' + walletState.coinPublicKey);
+                        if (walletState.encryptionPublicKey) log('   🔐 ENCRYPTION PUBLIC KEY: ' + walletState.encryptionPublicKey);
+                    } else {
+                        log('   ⚠️  state() returned null');
+                    }
+                } catch (stateErr) {
+                    log('   ❌ state() error: ' + (stateErr.message || stateErr));
+                }
+            }
+
+            // Step 9: Try serviceUriConfig()
+            log('\n[STEP 9] Checking serviceUriConfig()...');
+            var svcSource = null;
+            if (typeof conn.serviceUriConfig === 'function') {
+                svcSource = conn;
+                log('   Using connector.serviceUriConfig()');
+            } else if (typeof api.serviceUriConfig === 'function') {
+                svcSource = api;
+                log('   Using api.serviceUriConfig()');
+            }
+
+            if (svcSource) {
+                try {
+                    var svcConfig = await svcSource.serviceUriConfig();
+                    log('   ✅ serviceUriConfig() returned!');
+                    if (svcConfig) {
+                        var cfgKeys = Object.keys(svcConfig);
+                        log('   keys: ' + JSON.stringify(cfgKeys));
+                        for (var ck = 0; ck < cfgKeys.length; ck++) {
+                            log('   .' + cfgKeys[ck] + ' = ' + String(svcConfig[cfgKeys[ck]]));
+                        }
+                        if (svcConfig.indexerUri) log('   🌐 INDEXER: ' + svcConfig.indexerUri);
+                        if (svcConfig.indexerWsUri) log('   🌐 INDEXER WS: ' + svcConfig.indexerWsUri);
+                        if (svcConfig.proverServerUri) log('   🌐 PROVER: ' + svcConfig.proverServerUri);
+                        if (svcConfig.nodeUri) log('   🌐 NODE: ' + svcConfig.nodeUri);
+                    } else {
+                        log('   ⚠️  serviceUriConfig() returned null');
+                    }
+                } catch (svcErr) {
+                    log('   ❌ serviceUriConfig() error: ' + (svcErr.message || svcErr));
+                }
+            } else {
+                log('   ⚠️  No serviceUriConfig() on connector or API');
+            }
+
+            // Step 10: Summary
+            log('\n============================================');
+            log('=== SUMMARY ===');
+            log('   Connector: ' + primary.path);
+            log('   API type: ' + (isMidnightAPI ? 'MIDNIGHT' : isCardanoAPI ? 'CARDANO CIP-30' : 'UNKNOWN'));
+            log('   enable(): ✅ SUCCESS');
+            if (isMidnightAPI) {
+                log('   state(): available');
+                log('   → Ready for Midnight transactions');
+                setStatus('CONNECTED via Midnight API at ' + primary.path, true);
+            } else if (isCardanoAPI) {
+                log('   → This connector exposes Cardano CIP-30, not Midnight API');
+                setStatus('Connected but got Cardano CIP-30 API (not Midnight)', false);
+            } else {
+                setStatus('Connected but API type unknown', false);
+            }
+            log('============================================');
+            log('=== END DEBUG ===');
         }
 
         // Initial check on page load

@@ -1,0 +1,28 @@
+{
+  "name": "midnight-bundle",
+  "version": "1.0.0",
+  "description": "Midnight SDK bundle for Unity WebGL - Counter contract interaction",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "build:copy": "node build.mjs && node scripts/copy-to-unity.js"
+  },
+  "dependencies": {
+    "@midnight-ntwrk/compact-runtime": "^0.8.1",
+    "@midnight-ntwrk/dapp-connector-api": "3.0.0",
+    "@midnight-ntwrk/ledger": "^4.0.0",
+    "@midnight-ntwrk/midnight-js-contracts": "^2.0.2",
+    "@midnight-ntwrk/midnight-js-fetch-zk-config-provider": "2.0.2",
+    "@midnight-ntwrk/midnight-js-http-client-proof-provider": "2.0.2",
+    "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "2.0.2",
+    "@midnight-ntwrk/midnight-js-network-id": "2.0.2",
+    "@midnight-ntwrk/midnight-js-types": "^2.0.2",
+    "buffer": "^6.0.3",
+    "events": "^3.3.0",
+    "stream-browserify": "^3.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.2",
+    "typescript": "^5.5.0"
+  }
+}

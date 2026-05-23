@@ -7,10 +7,8 @@ const projectRoot = join(__dirname, '..');
 
 const source = join(projectRoot, 'dist', 'mesh-sdk.bundle.js');
 const destinations = [
-  // Unity WebGL Template
+  // Unity WebGL Template (served as static script at runtime)
   join(projectRoot, '..', '..', 'Assets', 'WebGLTemplates', 'MidnightTemplate', 'TemplateData', 'mesh-sdk.bundle.js'),
-  // Also copy to Plugins/WebGL for reference
-  join(projectRoot, '..', '..', 'Assets', 'Plugins', 'WebGL', 'mesh-sdk.bundle.js'),
 ];
 
 console.log('Copying mesh-sdk.bundle.js to Unity...');
