@@ -5,6 +5,44 @@
 
 ---
 
+## ⭐ Session 05 Summary (2026-05-22 evening) — Tx submission flow fixed, pending live network test
+
+**Status: ALMOST COMPLETE** — tx flow is now structurally correct. Tagged `v1.1.0-midnight-counter-almost-complete`.
+
+### What was fixed today
+
+| Issue | Root Cause | Fix |
+|---|---|---|
+| `submitTransaction` returning `undefined` treated as failure | DApp connector v4 spec: `submitTransaction(txHex)` returns `void` / `undefined` on success, not a tx hash. | Changed `submitTx` to treat `undefined` as success (`submitSucceeded = true`), not failure. |
+| `RemoteApiShutdownError: Remote API with channel 'midnight-wallet' was shutdown` after `balanceUnsealedTransaction` | We incorrectly hypothesized a two-phase API (`balanceUnsealedTransaction` → `balanceSealedTransaction`). `balanceSealedTransaction` is for adding MORE balance to an already-sealed tx; calling it after the first seal shuts down the wallet channel. | **Removed** the `balanceSealedTransaction` call. `balanceUnsealedTransaction` already returns a fully sealed tx (hex doubles from ~6600 → ~13100 chars = signatures/balance commitments added). |
+| Locally computed `txHash` never found on explorer | `hexToTransaction` uses a fallback deserialize path (`'signature','proof','binding', bytes`) which produces a tx with bogus placeholder fields. The hash of that object doesn't match the on-chain tx. | Added `getTxHistory()` lookup after submission to capture the wallet's canonical txHash. Also added `_walletReturnedHash` capture from any 64-char hex field in `balanceUnsealedTransaction` result. |
+| `dustBalance: { balance: "0", cap: "0" }` while NIGHT balance unchanged | Wallet UI desync, not real dust depletion. `cap: 0` with 1 NIGHT token is mathematically impossible — dust regen cap should be ~5 tDUST. | Identified as wallet-side bug. Recommended: resync Lace wallet (toggle network off/on) or check Lace's own UI for ground-truth dust balance. Not a code bug. |
+
+### Key code changes (committed + pushed)
+
+- `midnight-unity-bridge.ts`:
+  - `submitTx` now treats `undefined` as success
+  - Removed broken `balanceSealedTransaction` chain step
+  - Added `getTxHistory()` post-submission lookup for canonical txHash
+  - Added `_walletReturnedHash` capture from `balanceUnsealedTransaction` result fields
+  - Added wallet API method enumeration (walks prototype chain for Lace v4)
+  - Added ZK config provider debug logging (prover key, verifier key, ZKIR sizes)
+  - Improved error logging with full cause chain inspection
+- `index.html`: cache-bust bumped to `?v=20260522-1840`
+
+### What we need for the finish line
+
+1. **Resync Lace wallet** to fix dust accounting (or top up tDUST from faucet if actually depleted).
+2. **Run one more test** with the `?v=20260522-1840` build.
+3. **Look for** in console:
+   - `[MidnightSDK] submitTx: submitTransaction returned: undefined` → success
+   - `[MidnightSDK] submitTx: getTxHistory returned N entries`
+   - `[MidnightSDK] submitTx: history hash candidate field "...": <real hash>`
+4. **Verify on explorer** with the hash from `getTxHistory`.
+5. **Confirm counter increments** after ~30–90s (indexer propagation delay).
+
+---
+
 ## ⭐ Session 04 Summary (2026-05-22) — Wallet submission diagnostic build
 
 **Symptom from end of Session 03:** `submitTx` reports `wallet accepted tx` and returns a computed `txId`, but the **tx never appears on the explorer**. Both `2f0ee3e3…e8f4` and `c28ded6e…9580` are 404 in `explorer.preview.midnight.network`. Counter stays at 0 forever; both `watchForTxData` and the manual `readCounter` poll fallback time out.
@@ -158,24 +196,25 @@ Adopt both as standard debugging plumbing whenever an SDK uses `{ cause: err }` 
 | `connectMidnightPreview('auto')` | ✅ Working | Connects to Preview network, returns shielded address, coin public key, encryption public key. |
 | `getWalletState()` | ✅ Working | Returns balances (tDUST, unshielded, dust). |
 | `readCounter()` | ✅ Working | Queries indexer, returns counter value (currently `0`). |
-| `incrementCounter()` (submit) | ✅ **Working as of 2026-05-19** | Tx hex submitted to wallet, user signs in Lace popup, wallet accepts. First successful submit: `2f0ee3e3fb0d5c57622797a45493709210e9b27cec44b3dac6b432d74fc0e8f4`. Fixed by hex-encoding transactions before passing to `api.balanceUnsealedTransaction` / `api.submitTransaction` (Lace v4 API is string-based). |
-| `incrementCounter()` (on-chain confirmation → counter update) | 🟡 **Partially mitigated** | `publicDataProvider.watchForTxData(txId)` can hang indefinitely. Added 2-minute timeout + manual `readCounter()` polling fallback. UI no longer freezes forever; if watcher hangs we poll the indexer directly for the updated counter. |
+| `incrementCounter()` (submit) | ✅ **Structurally correct as of 2026-05-22** | Tx hex submitted to wallet, user signs, wallet accepts (`submitTransaction` returns `undefined` = success per v4 spec). Removed broken `balanceSealedTransaction` step. Added `getTxHistory()` lookup for canonical txHash. |
+| `incrementCounter()` (on-chain confirmation → counter update) | 🟡 **Pending dust + live network test** | `publicDataProvider.watchForTxData(txId)` can hang indefinitely. Added 2-minute timeout + manual `readCounter()` polling fallback. UI no longer freezes forever. **Needs one more run with valid dust balance to confirm on-chain increment.** |
 | `@meshsdk/midnight-setup` | ❌ Skipped | Package installed but `dist/` missing. Not blocking — wallet API used directly. |
 
 ---
 
 ## 4. Next Steps (for following session)
 
-1. **Submit a second increment** with the current bundle (`?v=20260519-0905`) and observe the console for:
-   - `[MidnightSDK] proofProvider.proveTx called` — confirms the proof server is being hit (if you run a local one, check its logs at the same timestamp).
-   - `[MidnightSDK] submitTx: wallet accepted tx` — tx is on chain.
-   - `[MidnightSDK] increment circuit timed out` — if `watchForTxData` hangs; the manual polling fallback will then poll `readCounter()` every 10 s for 2 minutes.
-   - `[MidnightSDK] Manual poll detected counter update: N` — confirms the tx finalized even though the SDK watcher hung.
-2. **If the proof server receives nothing**, check that `setupProviders()` logs the URI you expect. Lace v4 may be proving internally inside `balanceUnsealedTransaction`; in that case `httpClientProofProvider` is bypassed and a local proof server will never see traffic. This is normal — the wallet handles proving.
-3. **Push the milestone tag** once the counter increments — recommended `v1.2.0-midnight-counter-end-to-end`.
-4. **(Optional, idiomatic v4)** Migrate `setupProviders()` to use `await api.getProvingProvider(fixedZkConfig)` instead of `httpClientProofProvider(proofServerUri, fixedZkConfig)`. v4.0.0 deprecates `proverServerUri`. The wallet handles proving modality (local / remote / hardware) and we stop needing a network URL. Wrap in feature-detect: prefer `api.getProvingProvider` when present, fall back to `httpClientProofProvider` for older wallets.
-5. **(Optional, hygiene)** Remove `getZKIRFull` and the `_zkirFullCache` from `FixedZkConfigProvider` — unused since the `.bzkir` fix.
-6. **Begin PROJECT_PLAN.md Phase 2** (configurable contracts at runtime) once the Counter loop is green.
+1. **Resync Lace wallet** to fix dust accounting (or top up tDUST from faucet if actually depleted). `dustBalance: { balance: "0", cap: "0" }` with 1 NIGHT token is a wallet UI desync — cap should be ~5 tDUST.
+2. **Run one more test** with the current bundle (`?v=20260522-1840`) and observe the console for:
+   - `[MidnightSDK] submitTx: submitTransaction returned: undefined` — success
+   - `[MidnightSDK] submitTx: getTxHistory returned N entries`
+   - `[MidnightSDK] submitTx: history hash candidate field "...": <real hash>` — canonical txHash
+3. **Verify on explorer** with the hash from `getTxHistory`: `https://explorer.preview.midnight.network/transactions/<hash>`
+4. **Confirm counter increments** after ~30–90s (indexer propagation delay). Look for `[MidnightSDK] Manual poll N/12: counter = 1`.
+5. **Push the milestone tag** once the counter increments — recommended `v1.2.0-midnight-counter-end-to-end`.
+6. **(Optional, idiomatic v4)** Migrate `setupProviders()` to use `await api.getProvingProvider(fixedZkConfig)` instead of `httpClientProofProvider(proofServerUri, fixedZkConfig)`. v4.0.0 deprecates `proverServerUri`. The wallet handles proving modality (local / remote / hardware) and we stop needing a network URL. Wrap in feature-detect: prefer `api.getProvingProvider` when present, fall back to `httpClientProofProvider` for older wallets.
+7. **(Optional, hygiene)** Remove `getZKIRFull` and the `_zkirFullCache` from `FixedZkConfigProvider` — unused since the `.bzkir` fix.
+8. **Begin PROJECT_PLAN.md Phase 2** (configurable contracts at runtime) once the Counter loop is green.
 
 ### Proof Server in this Flow
 - `FetchZkConfigProvider` only reads **static config files** (verifier keys, prover keys, IR). These are now local in `StreamingAssets`.
@@ -195,8 +234,9 @@ Adopt both as standard debugging plumbing whenever an SDK uses `{ cause: err }` 
 | Default Preview ZK base URL | `https://indexer.preview.midnight.network/api/v4/zk` |
 | Default counter contract address | `8c31306d717dd2b79f30785ae7f0f5241f6f891d63441827395d8be1fecd88dd` |
 | WASM large-file threshold | 4 MB (in `build.mjs`) |
-| Cache-bust (current) | `?v=20260519-0905` |
+| Cache-bust (current) | `?v=20260522-1840` |
 | First successful increment tx | `2f0ee3e3fb0d5c57622797a45493709210e9b27cec44b3dac6b432d74fc0e8f4` |
+| Current tag | `v1.1.0-midnight-counter-almost-complete` |
 | Midnight NetworkId value | `'preview'` (pass-through from wallet — Lace v4.0.1 expects literal deployment environment name, not ledger network ID) |
 | LevelDB private-state password | `Midnight-Unity-Bridge-2026!` (≥16 chars, 4 char classes) |
 
