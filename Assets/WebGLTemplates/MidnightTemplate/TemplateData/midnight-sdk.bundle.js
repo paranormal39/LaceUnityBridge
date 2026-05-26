@@ -79638,6 +79638,25 @@ ${operationTypes.join("\n")}
       return null;
     }
   }
+  async function hintUsage(methods) {
+    if (!state.api) {
+      warn("hintUsage: Not connected");
+      return false;
+    }
+    try {
+      if (typeof state.api.hintUsage === "function") {
+        await state.api.hintUsage(methods);
+        log("hintUsage: success for methods:", methods.join(", "));
+        return true;
+      } else {
+        warn("hintUsage: Method not available on API (requires v4.0.0+)");
+        return false;
+      }
+    } catch (err) {
+      error("hintUsage failed:", err.message || err);
+      return false;
+    }
+  }
   function isConnectorAvailable() {
     const discovered = discoverLaceProvider();
     return discovered !== null;
@@ -79672,6 +79691,7 @@ ${operationTypes.join("\n")}
     balanceSealedTransaction,
     submitTransaction,
     getProvingProvider,
+    hintUsage,
     // API Introspection
     introspectApi,
     logApiMethods,
@@ -122219,7 +122239,8 @@ Use exportPrivateStates() and exportSigningKeys() to create backups.`);
         if (typeof api.getProvingProvider === "function") {
           console.log("[MidnightSDK] proofProvider: api.getProvingProvider available, attempting wallet proving...");
           try {
-            walletProver = api.getProvingProvider();
+            const keyMaterialProvider = fixedZkConfig.asKeyMaterialProvider();
+            walletProver = api.getProvingProvider(keyMaterialProvider);
             console.log("[MidnightSDK] proofProvider: wallet proving provider obtained:", typeof walletProver);
           } catch (e) {
             console.warn("[MidnightSDK] proofProvider: wallet getProvingProvider failed:", e?.message || String(e));
@@ -122412,6 +122433,7 @@ Use exportPrivateStates() and exportSigningKeys() to create backups.`);
     getConfiguration: getConfiguration2,
     balanceUnsealedTransaction: balanceUnsealedTransaction2,
     balanceSealedTransaction: balanceSealedTransaction2,
+    hintUsage,
     // Counter contract operations
     readCounter,
     incrementCounter,
@@ -122447,8 +122469,9 @@ Use exportPrivateStates() and exportSigningKeys() to create backups.`);
     getCoinPublicKey: () => state2.walletState?.shieldedCoinPublicKey || state2.walletState?.coinPublicKey || null,
     getShieldedAddress: () => state2.walletState?.shieldedAddress || null,
     // Version
-    version: "2.1.0",
+    version: "2.2.0",
     apiVersion: "4.0.4",
+    buildTag: "v1.2.0-midnight-counter-end-to-end",
     buildTime: (/* @__PURE__ */ new Date()).toISOString()
   };
   window.MidnightSDK = { ...window.MidnightSDK || {}, ...MidnightSDKExports };

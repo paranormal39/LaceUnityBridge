@@ -2426,9 +2426,10 @@ async function setupProviders(privateStateStoreName: string = 'unity-midnight-st
       if (typeof (api as any).getProvingProvider === 'function') {
         console.log('[MidnightSDK] proofProvider: api.getProvingProvider available, attempting wallet proving...');
         try {
-          // getProvingProvider may need a keyMaterialProvider argument.
-          // If it fails without args we fall back to the remote proof server.
-          walletProver = (api as any).getProvingProvider();
+          // v4.0.0 idiomatic: pass keyMaterialProvider to delegate proving to wallet
+          // The wallet can then choose local/remote/hardware proving based on user prefs
+          const keyMaterialProvider = fixedZkConfig.asKeyMaterialProvider();
+          walletProver = (api as any).getProvingProvider(keyMaterialProvider);
           console.log('[MidnightSDK] proofProvider: wallet proving provider obtained:', typeof walletProver);
         } catch (e: any) {
           console.warn('[MidnightSDK] proofProvider: wallet getProvingProvider failed:', e?.message || String(e));
@@ -2670,6 +2671,7 @@ const MidnightSDKExports = {
   getConfiguration,
   balanceUnsealedTransaction,
   balanceSealedTransaction,
+  hintUsage: MidnightConnector.hintUsage,
 
   // Counter contract operations
   readCounter,
@@ -2715,8 +2717,9 @@ const MidnightSDKExports = {
   getShieldedAddress: () => state.walletState?.shieldedAddress || null,
 
   // Version
-  version: '2.1.0',
+  version: '2.2.0',
   apiVersion: '4.0.4',
+  buildTag: 'v1.2.0-midnight-counter-end-to-end',
   buildTime: new Date().toISOString(),
 };
 

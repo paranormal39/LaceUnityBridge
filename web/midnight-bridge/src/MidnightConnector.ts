@@ -1703,6 +1703,35 @@ export async function getProvingProvider(keyMaterialProvider: any): Promise<any 
   }
 }
 
+/**
+ * Hint usage to the wallet (v4.0.0).
+ * Proactively tells the wallet which API methods we intend to use,
+ * allowing wallets to request user permissions upfront for better UX.
+ * 
+ * @param methods - Array of method names we intend to use
+ * @returns true if hint was accepted
+ */
+export async function hintUsage(methods: string[]): Promise<boolean> {
+  if (!state.api) {
+    warn('hintUsage: Not connected');
+    return false;
+  }
+  
+  try {
+    if (typeof (state.api as any).hintUsage === 'function') {
+      await (state.api as any).hintUsage(methods);
+      log('hintUsage: success for methods:', methods.join(', '));
+      return true;
+    } else {
+      warn('hintUsage: Method not available on API (requires v4.0.0+)');
+      return false;
+    }
+  } catch (err: any) {
+    error('hintUsage failed:', err.message || err);
+    return false;
+  }
+}
+
 // ============================================================
 // Legacy Compatibility
 // ============================================================
@@ -1755,6 +1784,7 @@ export function isConnectorAvailable(): boolean {
   balanceSealedTransaction,
   submitTransaction,
   getProvingProvider,
+  hintUsage,
   
   // API Introspection
   introspectApi,

@@ -129,7 +129,7 @@
   <!-- MUST load BEFORE midnight-counter-bindings.js and Unity      -->
   <!-- Cache-bust: append ?v=BUILD_STAMP to force reload            -->
   <!-- ============================================================ -->
-  <script src="TemplateData/midnight-sdk.bundle.js?v=20260522-1840"
+  <script src="TemplateData/midnight-sdk.bundle.js?v=20260525-2023"
           onerror="console.error('[MidnightTemplate] FAILED to load midnight-sdk.bundle.js — check path/404/CORS')"
           onload="console.log('[MidnightTemplate] midnight-sdk.bundle.js script tag onload fired')">
   </script>
@@ -138,7 +138,7 @@
     (function() {
       console.log("[MidnightTemplate] Immediate check — window.MidnightSDK:", typeof window.MidnightSDK);
       if (typeof window.MidnightSDK !== 'undefined') {
-        console.log("[MidnightTemplate] MidnightSDK loaded! version:", window.MidnightSDK.version);
+        console.log("[MidnightTemplate] MidnightSDK loaded! version:", window.MidnightSDK.version, "buildTag:", window.MidnightSDK.buildTag);
         console.log("[MidnightTemplate] SDK available: true");
         console.log("[MidnightTemplate] SDK keys:", Object.keys(window.MidnightSDK));
         console.log("[MidnightTemplate] Connector available:", window.MidnightSDK.isConnectorAvailable());
