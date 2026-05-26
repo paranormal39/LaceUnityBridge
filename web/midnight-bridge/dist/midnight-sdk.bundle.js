@@ -121702,7 +121702,7 @@ Use exportPrivateStates() and exportSigningKeys() to create backups.`);
       console.log("[MidnightSDK] Deployed contract found");
       console.log("[MidnightSDK] DEBUG: Testing ZK config provider...");
       try {
-        const zkBaseUrl = `${window.location.origin}/StreamingAssets/zk/counter/`;
+        const zkBaseUrl = `${window.location.origin}/zk/counter/`;
         console.log("[MidnightSDK] DEBUG: Creating FetchZkConfigProvider with URL:", zkBaseUrl);
         const testZkConfig = new FetchZkConfigProvider(zkBaseUrl, fetch.bind(window));
         console.log("[MidnightSDK] DEBUG: FetchZkConfigProvider created, checking methods...");
@@ -122125,7 +122125,7 @@ Use exportPrivateStates() and exportSigningKeys() to create backups.`);
       console.log("[MidnightSDK] balanceUnsealedTransaction sealed hex length:", sealedHex?.length);
       return sealedHex;
     } : (tx, newCoins) => api.balanceAndProveTransaction(tx, newCoins);
-    const zkBaseUrl = `${window.location.origin}/StreamingAssets/zk/counter/`;
+    const zkBaseUrl = `${window.location.origin}/zk/counter/`;
     console.log("[MidnightSDK] ZK config base URL:", zkBaseUrl);
     const proofServerUri = uris.proverServerUri || uris.proofServerUri || "http://127.0.0.1:6300";
     console.log("[MidnightSDK] Proof server URI:", proofServerUri);

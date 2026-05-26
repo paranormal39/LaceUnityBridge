@@ -1682,7 +1682,7 @@ async function incrementCounter(contractAddress: string = DEFAULT_COUNTER_ADDRES
     // DEBUG: Test ZK config provider directly
     console.log('[MidnightSDK] DEBUG: Testing ZK config provider...');
     try {
-      const zkBaseUrl = `${window.location.origin}/StreamingAssets/zk/counter/`;
+      const zkBaseUrl = `${window.location.origin}/zk/counter/`;
       console.log('[MidnightSDK] DEBUG: Creating FetchZkConfigProvider with URL:', zkBaseUrl);
       const testZkConfig = new FetchZkConfigProvider(zkBaseUrl, fetch.bind(window));
       console.log('[MidnightSDK] DEBUG: FetchZkConfigProvider created, checking methods...');
@@ -2282,9 +2282,9 @@ async function setupProviders(privateStateStoreName: string = 'unity-midnight-st
       }
     : (tx: any, newCoins: any) => api.balanceAndProveTransaction(tx, newCoins);
 
-  // ZK config provider: point to StreamingAssets where ZK keys are served
-  // Unity WebGL serves StreamingAssets from the root
-  const zkBaseUrl = `${window.location.origin}/StreamingAssets/zk/counter/`;
+  // ZK config provider: point to TemplateData/zk where ZK keys are served
+  // Unity WebGL dev server serves TemplateData from the root
+  const zkBaseUrl = `${window.location.origin}/zk/counter/`;
   console.log('[MidnightSDK] ZK config base URL:', zkBaseUrl);
 
   // Proof server: wallet config first, then local Docker fallback
