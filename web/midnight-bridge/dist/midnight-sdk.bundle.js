@@ -78674,12 +78674,17 @@ ${operationTypes.join("\n")}
   function isLaceProvider(provider) {
     if (!provider || typeof provider !== "object")
       return false;
-    const name = provider.name;
-    if (typeof name === "string" && name.toLowerCase() === "lace") {
+    const name = typeof provider.name === "string" ? provider.name.toLowerCase() : "";
+    if (name === "lace" || name === "1am") {
       return true;
     }
-    const rdns = provider.rdns;
-    if (typeof rdns === "string" && rdns.toLowerCase().includes("lace")) {
+    const rdns = typeof provider.rdns === "string" ? provider.rdns.toLowerCase() : "";
+    if (rdns.includes("lace") || rdns.includes("1am") || rdns.includes("midnight")) {
+      return true;
+    }
+    const apiVersion = typeof provider.apiVersion === "string" ? provider.apiVersion : "";
+    const hasConnect = typeof provider.connect === "function" || provider && typeof Object.getPrototypeOf(provider)?.connect === "function";
+    if (apiVersion.startsWith("4.") && hasConnect) {
       return true;
     }
     return false;
@@ -83320,9 +83325,9 @@ ${val.stack}`;
   };
 
   // node_modules/@midnight-ntwrk/compact-runtime/dist/witness.js
-  function createWitnessContext(ledger2, privateState, contractAddress) {
+  function createWitnessContext(ledger3, privateState, contractAddress) {
     return {
-      ledger: ledger2,
+      ledger: ledger3,
       privateState,
       contractAddress
     };
@@ -121571,9 +121576,25 @@ Use exportPrivateStates() and exportSigningKeys() to create backups.`);
           const indexerWsUri = indexerUri.replace("https://", "wss://").replace("/graphql", "/graphql/ws");
           const publicDataProvider = _indexerPublicDataProvider(indexerUri, indexerWsUri);
           const contractState = await publicDataProvider.queryContractState(contractAddress);
-          console.log("[MidnightSDK] Contract state:", contractState);
-          let counterValue2 = 0;
-          if (contractState && contractState.publicLedgerState) {
+          console.log("[MidnightSDK] Contract state class:", contractState?.constructor?.name);
+          console.log("[MidnightSDK] Contract state keys:", contractState ? Object.keys(contractState) : "null");
+          let counterValue2 = null;
+          const ledgerFn = void 0 ?? contract_exports?.ledger ?? (void 0)?.ledger;
+          if (typeof ledgerFn === "function" && contractState) {
+            try {
+              const data = contractState.data ?? contractState;
+              const decoded = ledgerFn(data);
+              console.log("[MidnightSDK] Decoded ledger state:", decoded);
+              if (decoded && decoded.round !== void 0) {
+                counterValue2 = typeof decoded.round === "bigint" ? Number(decoded.round) : parseInt(String(decoded.round), 10);
+              }
+            } catch (decodeErr) {
+              console.warn("[MidnightSDK] ledger() decode failed:", decodeErr?.message || decodeErr);
+            }
+          } else {
+            console.warn("[MidnightSDK] counter-contract ledger() function not found, falling back to legacy publicLedgerState path");
+          }
+          if (counterValue2 === null && contractState && contractState.publicLedgerState) {
             const publicState = contractState.publicLedgerState;
             if (typeof publicState.round === "number") {
               counterValue2 = publicState.round;
@@ -121583,8 +121604,11 @@ Use exportPrivateStates() and exportSigningKeys() to create backups.`);
               counterValue2 = parseInt(String(publicState.round), 10);
             }
           }
-          console.log("[MidnightSDK] Counter value:", counterValue2);
-          return { success: true, counter: counterValue2, contractAddress, error: null };
+          if (counterValue2 !== null) {
+            console.log("[MidnightSDK] Counter value:", counterValue2);
+            return { success: true, counter: counterValue2, contractAddress, error: null };
+          }
+          console.warn("[MidnightSDK] Could not decode counter from contract state, falling through to GraphQL");
         } catch (queryErr) {
           console.warn("[MidnightSDK] SDK queryContractState failed:", queryErr.message);
         }
@@ -121702,7 +121726,7 @@ Use exportPrivateStates() and exportSigningKeys() to create backups.`);
       console.log("[MidnightSDK] Deployed contract found");
       console.log("[MidnightSDK] DEBUG: Testing ZK config provider...");
       try {
-        const zkBaseUrl = `${window.location.origin}/zk/counter/`;
+        const zkBaseUrl = `${window.location.origin}/TemplateData/zk/counter/`;
         console.log("[MidnightSDK] DEBUG: Creating FetchZkConfigProvider with URL:", zkBaseUrl);
         const testZkConfig = new FetchZkConfigProvider(zkBaseUrl, fetch.bind(window));
         console.log("[MidnightSDK] DEBUG: FetchZkConfigProvider created, checking methods...");
@@ -122125,7 +122149,7 @@ Use exportPrivateStates() and exportSigningKeys() to create backups.`);
       console.log("[MidnightSDK] balanceUnsealedTransaction sealed hex length:", sealedHex?.length);
       return sealedHex;
     } : (tx, newCoins) => api.balanceAndProveTransaction(tx, newCoins);
-    const zkBaseUrl = `${window.location.origin}/zk/counter/`;
+    const zkBaseUrl = `${window.location.origin}/TemplateData/zk/counter/`;
     console.log("[MidnightSDK] ZK config base URL:", zkBaseUrl);
     const proofServerUri = uris.proverServerUri || uris.proofServerUri || "http://127.0.0.1:6300";
     console.log("[MidnightSDK] Proof server URI:", proofServerUri);
@@ -122298,8 +122322,8 @@ Use exportPrivateStates() and exportSigningKeys() to create backups.`);
           } catch (e) {
             console.warn("[MidnightSDK] submitTx: could not compute tx hash:", e);
           }
-          if (_walletReturnedHash) {
-            console.log("[MidnightSDK] submitTx: using wallet-captured hash from balanceTx:", _walletReturnedHash);
+          if (!localHashOk && _walletReturnedHash) {
+            console.log("[MidnightSDK] submitTx: no local hash, using wallet-captured hash from balanceTx:", _walletReturnedHash);
             txId = _walletReturnedHash;
           }
           const apiMethods = Object.getOwnPropertyNames(api).filter((k) => typeof api[k] === "function");
@@ -122355,26 +122379,18 @@ Use exportPrivateStates() and exportSigningKeys() to create backups.`);
             txId = submitResult.txId;
             console.log("[MidnightSDK] submitTx: using wallet-returned txId:", txId);
           }
-          if (typeof api.getTxHistory === "function") {
+          if (!localHashOk && typeof api.getTxHistory === "function") {
             try {
               const history = await api.getTxHistory();
               const entries2 = Array.isArray(history) ? history : history && Array.isArray(history.transactions) ? history.transactions : history && Array.isArray(history.history) ? history.history : [];
-              console.log("[MidnightSDK] submitTx: getTxHistory returned", entries2.length, "entries");
+              console.log("[MidnightSDK] submitTx: getTxHistory returned", entries2.length, "entries (fallback, no local hash)");
               if (entries2.length > 0) {
                 const newest = entries2[0];
-                const summary5 = {};
-                if (newest && typeof newest === "object") {
-                  for (const key of Object.keys(newest)) {
-                    const val = newest[key];
-                    summary5[key] = typeof val === "string" && val.length > 100 ? `${val.substring(0, 30)}...(${val.length} chars)` : val;
-                  }
-                }
-                console.log("[MidnightSDK] submitTx: newest history entry (JSON):", JSON.stringify(summary5));
                 if (newest && typeof newest === "object") {
                   for (const key of Object.keys(newest)) {
                     const val = newest[key];
                     if (typeof val === "string" && /^[0-9a-fA-F]{64}$/.test(val)) {
-                      console.log(`[MidnightSDK] submitTx: history hash candidate field "${key}":`, val);
+                      console.log(`[MidnightSDK] submitTx: using history fallback hash from field "${key}":`, val);
                       txId = val;
                       _walletReturnedHash = val;
                       break;
@@ -122384,6 +122400,13 @@ Use exportPrivateStates() and exportSigningKeys() to create backups.`);
               }
             } catch (e) {
               console.warn("[MidnightSDK] submitTx: getTxHistory failed:", e?.message || String(e));
+            }
+          } else if (typeof api.getTxHistory === "function") {
+            try {
+              const history = await api.getTxHistory();
+              const entries2 = Array.isArray(history) ? history : history && Array.isArray(history.transactions) ? history.transactions : history && Array.isArray(history.history) ? history.history : [];
+              console.log("[MidnightSDK] submitTx: getTxHistory has", entries2.length, "entries (informational; using local hash)");
+            } catch {
             }
           }
           console.log("[MidnightSDK] submitTx: wallet accepted tx, returning txId:", txId);

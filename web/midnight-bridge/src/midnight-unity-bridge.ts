@@ -1506,10 +1506,40 @@ async function readCounter(contractAddress: string = DEFAULT_COUNTER_ADDRESS): P
         const indexerWsUri = indexerUri.replace('https://', 'wss://').replace('/graphql', '/graphql/ws');
         const publicDataProvider = _indexerPublicDataProvider(indexerUri, indexerWsUri);
         const contractState = await publicDataProvider.queryContractState(contractAddress);
-        console.log('[MidnightSDK] Contract state:', contractState);
-        let counterValue = 0;
-        if (contractState && contractState.publicLedgerState) {
-          const publicState = contractState.publicLedgerState;
+        console.log('[MidnightSDK] Contract state class:', contractState?.constructor?.name);
+        console.log('[MidnightSDK] Contract state keys:', contractState ? Object.keys(contractState) : 'null');
+
+        // The Midnight indexer returns a `_ContractState` instance, NOT a plain
+        // object with `publicLedgerState`. The decoded counter is obtained by
+        // running the contract's `ledger()` decoder over `contractState.data`.
+        // counter-contract exports `ledger(state) -> { round: bigint }`.
+        let counterValue: number | null = null;
+        const ledgerFn =
+          (counterContract as any).ledger
+          ?? (counterContract as any).Counter?.ledger
+          ?? (counterContract as any).default?.ledger;
+
+        if (typeof ledgerFn === 'function' && contractState) {
+          try {
+            // ledger() accepts either a ChargedState or a raw StateValue
+            const data = (contractState as any).data ?? contractState;
+            const decoded = ledgerFn(data);
+            console.log('[MidnightSDK] Decoded ledger state:', decoded);
+            if (decoded && decoded.round !== undefined) {
+              counterValue = typeof decoded.round === 'bigint'
+                ? Number(decoded.round)
+                : parseInt(String(decoded.round), 10);
+            }
+          } catch (decodeErr: any) {
+            console.warn('[MidnightSDK] ledger() decode failed:', decodeErr?.message || decodeErr);
+          }
+        } else {
+          console.warn('[MidnightSDK] counter-contract ledger() function not found, falling back to legacy publicLedgerState path');
+        }
+
+        // Legacy fallback (kept for forward-compat with possible future SDK changes)
+        if (counterValue === null && contractState && (contractState as any).publicLedgerState) {
+          const publicState = (contractState as any).publicLedgerState;
           if (typeof publicState.round === 'number') {
             counterValue = publicState.round;
           } else if (typeof publicState.round === 'bigint') {
@@ -1518,8 +1548,12 @@ async function readCounter(contractAddress: string = DEFAULT_COUNTER_ADDRESS): P
             counterValue = parseInt(String(publicState.round), 10);
           }
         }
-        console.log('[MidnightSDK] Counter value:', counterValue);
-        return { success: true, counter: counterValue, contractAddress, error: null };
+
+        if (counterValue !== null) {
+          console.log('[MidnightSDK] Counter value:', counterValue);
+          return { success: true, counter: counterValue, contractAddress, error: null };
+        }
+        console.warn('[MidnightSDK] Could not decode counter from contract state, falling through to GraphQL');
       } catch (queryErr: any) {
         console.warn('[MidnightSDK] SDK queryContractState failed:', queryErr.message);
         // Fall through to GraphQL
@@ -1682,7 +1716,7 @@ async function incrementCounter(contractAddress: string = DEFAULT_COUNTER_ADDRES
     // DEBUG: Test ZK config provider directly
     console.log('[MidnightSDK] DEBUG: Testing ZK config provider...');
     try {
-      const zkBaseUrl = `${window.location.origin}/zk/counter/`;
+      const zkBaseUrl = `${window.location.origin}/TemplateData/zk/counter/`;
       console.log('[MidnightSDK] DEBUG: Creating FetchZkConfigProvider with URL:', zkBaseUrl);
       const testZkConfig = new FetchZkConfigProvider(zkBaseUrl, fetch.bind(window));
       console.log('[MidnightSDK] DEBUG: FetchZkConfigProvider created, checking methods...');
@@ -2283,8 +2317,8 @@ async function setupProviders(privateStateStoreName: string = 'unity-midnight-st
     : (tx: any, newCoins: any) => api.balanceAndProveTransaction(tx, newCoins);
 
   // ZK config provider: point to TemplateData/zk where ZK keys are served
-  // Unity WebGL dev server serves TemplateData from the root
-  const zkBaseUrl = `${window.location.origin}/zk/counter/`;
+  // Unity WebGL dev server serves from project root, TemplateData is sibling to Build/
+  const zkBaseUrl = `${window.location.origin}/TemplateData/zk/counter/`;
   console.log('[MidnightSDK] ZK config base URL:', zkBaseUrl);
 
   // Proof server: wallet config first, then local Docker fallback
@@ -2488,17 +2522,20 @@ async function setupProviders(privateStateStoreName: string = 'unity-midnight-st
         try {
           const txObj = hexToTransaction(txHex);
           txId = txObj.transactionHash();
-          // Only trust the local hash if the simple deserialize path worked
-          // (the fallback path uses bogus sig/prf/bind args and produces garbage)
+          // Both deserialize paths (simple + 'signature'/'proof'/'binding' fallback)
+          // produce the same on-chain hash. Verified 2026-05-26 against
+          // explorer.1am.xyz: locally computed fcdb34… was the indexed hash.
+          // Therefore: any 64-char hex output is a trusted on-chain hash.
           localHashOk = !!txId && /^[0-9a-fA-F]{64}$/.test(txId);
           console.log('[MidnightSDK] submitTx: computed txHash:', txId, '(trusted:', localHashOk, ')');
         } catch (e) {
           console.warn('[MidnightSDK] submitTx: could not compute tx hash:', e);
         }
 
-        // Prefer the wallet-returned hash captured during balanceTx
-        if (_walletReturnedHash) {
-          console.log('[MidnightSDK] submitTx: using wallet-captured hash from balanceTx:', _walletReturnedHash);
+        // Only use the wallet-captured hash from balanceTx if we have NO local
+        // hash. If we already computed one, the on-chain hash matches it.
+        if (!localHashOk && _walletReturnedHash) {
+          console.log('[MidnightSDK] submitTx: no local hash, using wallet-captured hash from balanceTx:', _walletReturnedHash);
           txId = _walletReturnedHash;
         }
 
@@ -2569,39 +2606,29 @@ async function setupProviders(privateStateStoreName: string = 'unity-midnight-st
           console.log('[MidnightSDK] submitTx: using wallet-returned txId:', txId);
         }
 
-        // Query getTxHistory() for the canonical wallet-recorded txHash —
-        // submitTransaction returns void, so this is the only reliable way
-        // to obtain the on-chain hash without depending on our local
-        // hexToTransaction round-trip (which uses a fallback deserialize
-        // path that produces incorrect hashes).
-        if (typeof (api as any).getTxHistory === 'function') {
+        // Query getTxHistory() ONLY as a fallback if we have no local hash.
+        // The on-chain hash is the one our local hexToTransaction().transactionHash()
+        // produces — verified 2026-05-26 against explorer.1am.xyz (locally computed
+        // fcdb34… was the indexed hash). getTxHistory()[0] is the most-recent entry
+        // in the wallet's own history, which is NOT necessarily our just-submitted
+        // tx (e.g. 1AM does dust-registration on first NIGHT receipt and that
+        // shows as a different entry). Overriding our correct local hash with
+        // entries[0].txHash silently points users to the wrong transaction.
+        if (!localHashOk && typeof (api as any).getTxHistory === 'function') {
           try {
             const history: any = await (api as any).getTxHistory();
             const entries = Array.isArray(history) ? history
               : (history && Array.isArray(history.transactions)) ? history.transactions
               : (history && Array.isArray(history.history)) ? history.history
               : [];
-            console.log('[MidnightSDK] submitTx: getTxHistory returned', entries.length, 'entries');
+            console.log('[MidnightSDK] submitTx: getTxHistory returned', entries.length, 'entries (fallback, no local hash)');
             if (entries.length > 0) {
-              // The most recent entry is our submission. Log full structure
-              // of the first entry so we know which field holds the hash.
               const newest = entries[0];
-              const summary: any = {};
-              if (newest && typeof newest === 'object') {
-                for (const key of Object.keys(newest)) {
-                  const val = newest[key];
-                  summary[key] = (typeof val === 'string' && val.length > 100)
-                    ? `${val.substring(0, 30)}...(${val.length} chars)`
-                    : val;
-                }
-              }
-              console.log('[MidnightSDK] submitTx: newest history entry (JSON):', JSON.stringify(summary));
-              // Find any 64-char hex hash
               if (newest && typeof newest === 'object') {
                 for (const key of Object.keys(newest)) {
                   const val = newest[key];
                   if (typeof val === 'string' && /^[0-9a-fA-F]{64}$/.test(val)) {
-                    console.log(`[MidnightSDK] submitTx: history hash candidate field "${key}":`, val);
+                    console.log(`[MidnightSDK] submitTx: using history fallback hash from field "${key}":`, val);
                     txId = val;
                     _walletReturnedHash = val;
                     break;
@@ -2611,6 +2638,18 @@ async function setupProviders(privateStateStoreName: string = 'unity-midnight-st
             }
           } catch (e: any) {
             console.warn('[MidnightSDK] submitTx: getTxHistory failed:', e?.message || String(e));
+          }
+        } else if (typeof (api as any).getTxHistory === 'function') {
+          // Diagnostic only: log history for visibility, but DO NOT override txId.
+          try {
+            const history: any = await (api as any).getTxHistory();
+            const entries = Array.isArray(history) ? history
+              : (history && Array.isArray(history.transactions)) ? history.transactions
+              : (history && Array.isArray(history.history)) ? history.history
+              : [];
+            console.log('[MidnightSDK] submitTx: getTxHistory has', entries.length, 'entries (informational; using local hash)');
+          } catch {
+            // ignore — purely informational
           }
         }
 

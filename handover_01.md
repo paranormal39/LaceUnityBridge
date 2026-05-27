@@ -1,7 +1,84 @@
 # Handover 01 — Unity WebGL Midnight SDK Bridge
 
 ## Session Date
-2026-05-16 / 2026-05-17 / 2026-05-19 / **2026-05-22** (latest)
+2026-05-16 / 2026-05-17 / 2026-05-19 / 2026-05-22 / **2026-05-26** (latest)
+
+---
+
+## 🎉 Session 06 Summary (2026-05-26 evening) — END-TO-END WORKING
+
+**Status: COMPLETE.** Tagged `v1.2.0-midnight-counter-end-to-end`.
+
+**On-chain proof:** [`fcdb34478f37273a7117301e044954e438d16872f33a1bf716889a4be485db64`](https://explorer.1am.xyz/tx/fcdb34478f37273a7117301e044954e438d16872f33a1bf716889a4be485db64?network=preview) — counter increment from a Unity WebGL build, landed at Midnight Preview block 907291. Counter reads back as `1`, then `2` after second click.
+
+### The pivot that unblocked everything: 1AM wallet
+
+After Session 05 left us stuck on `dustBalance: { cap: 0 }` (wallet-side dust desync, not a code bug), the user pointed us at **[1AM](https://1am.xyz/)** — a Midnight-native v4 wallet. Installing 1AM, funding it from the public faucet, and connecting from the existing 4.0.4 bundle revealed the path forward:
+
+- 1AM injected at `window.midnight['1am']` with `name: '1AM'` (capital), `apiVersion: '4.0.0'`, `rdns: 'com.midnight.1am'`.
+- Our `isLaceProvider()` filter only matched `name === 'lace'`, so 1AM was silently rejected.
+- Broadening to a **generic v4 detector** (any provider with `apiVersion: '4.x'` + `connect()`) unlocked 1AM and made the bridge wallet-agnostic.
+
+After that one-line filter change, the very first Increment click went to chain successfully.
+
+### What was fixed in this session
+
+| # | Issue | Root Cause | Fix |
+|---|---|---|---|
+| 1 | 1AM wallet not detected | `isLaceProvider` checked only `name === 'lace'` | Generic v4 filter — match any provider with `apiVersion: '4.x'` + `connect()` (or known names: lace, 1am, midnight). `@/Users/.../web/midnight-bridge/src/MidnightConnector.ts:285-309` |
+| 2 | `submitTx` returned wrong txHash for the explorer | `getTxHistory()[0]` is the wallet's most-recent entry, **not** necessarily the just-submitted tx (1AM had a prior dust-registration tx). We were overriding our correct local hash with that. | Trust the local hash from `hexToTransaction().transactionHash()` whenever it produces a 64-char hex. Use `getTxHistory()` only as a last-resort fallback. Log it informationally otherwise. `@/Users/.../midnight-unity-bridge.ts:2484-2620` |
+| 3 | `readCounter` always returned 0 even after a confirmed on-chain increment | We were reading `contractState.publicLedgerState.round` — that property doesn't exist on the SDK's `_ContractState` instance. The decoded counter requires running the contract's `ledger()` decoder over `contractState.data`. | Use `Counter.ledger(contractState.data).round`. The contract package exposes `ledger` under the `Counter` namespace. `@/Users/.../midnight-unity-bridge.ts:1502-1563` |
+
+### Things we *thought* were bugs but weren't
+
+- **The fallback `hexToTransaction` path is NOT broken.** The Session 04/05 comment claimed it produced "garbage hashes" — it doesn't. Verified against `explorer.1am.xyz`: locally computed `fcdb34478f…` is exactly the on-chain hash. The "trying with sig/prf/bind args" warning is benign.
+- **`balanceUnsealedTransaction sealed hex length: 13122`** is correct; matches what 1AM accepted and what the indexer ingested.
+- **The remote proof server fallback** (we hit `https://api-preview.1am.xyz` because 1AM's `getConfiguration().proverServerUri` points there) works fine. Wallet-side proving via `getProvingProvider()` returns an object that doesn't expose `proveTx` directly — we silently fell through to remote, which succeeded. Wiring up wallet-side proving is a future optimization, not a blocker.
+
+### Wallet config from 1AM (informational)
+
+```json
+{
+  "indexerUri": "https://indexer.preview.midnight.network/api/v4/graphql",
+  "indexerWsUri": "wss://indexer.preview.midnight.network/api/v4/graphql/ws",
+  "proverServerUri": "https://api-preview.1am.xyz",
+  "substrateNodeUri": "wss://rpc.preview.midnight.network",
+  "networkId": "preview"
+}
+```
+
+So 1AM uses the **public Midnight Preview** chain (indexer + node), and only hosts its own **proof server**. There's no chain fork — both wallets transact on the same Preview network.
+
+### Verification commands (for future sessions)
+
+```js
+// Confirm tx on the public indexer:
+fetch('https://indexer.preview.midnight.network/api/v4/graphql', {
+  method: 'POST', headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ query: `query { transactions(offset: { hash: "<HASH>" }) { hash block { height timestamp } } }` })
+}).then(r => r.json()).then(console.log);
+
+// Confirm contract latest action:
+fetch('https://indexer.preview.midnight.network/api/v4/graphql', {
+  method: 'POST', headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ query: `query { contractAction(address: "<ADDR>") { __typename ... on ContractCall { transaction { hash } } } }` })
+}).then(r => r.json()).then(console.log);
+```
+
+### Code changes (committed)
+
+- `MidnightConnector.ts` — generic v4 provider detection
+- `midnight-unity-bridge.ts` — txHash trust logic + `Counter.ledger()` decoder
+- `index.html` — cache-busts: `…2046-1am`, `…2055-1am-hashfix`, `…2100-readfix`
+- `README.md` — 1AM-first recommendation, Milestone 4 marked complete, troubleshooting refresh
+- `CUSTOM_CONTRACTS.md` — new design doc for generalizing the bridge to user-supplied contracts
+
+### What's next (for Session 07+)
+
+1. **Bucket B cleanups** — remove dead diagnostic code now that the flow works (the heavy ZK re-fetch debug block, `submitSealedTransaction` probe, unused `getZKIRFull`).
+2. **Wallet-side proving investigation** — figure out 1AM's `getProvingProvider` shape so we can drop the remote proof server dependency.
+3. **Contract registry refactor** — implement Phase 1 of `@/Users/.../CUSTOM_CONTRACTS.md` so a second contract can be added without touching the bridge.
+4. **Tag** `v1.2.0-midnight-counter-end-to-end` in git.
 
 ---
 

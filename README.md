@@ -1,6 +1,10 @@
 # LaceUnityBridge
 
-A Unity WebGL plugin that connects your game to **Cardano** and **Midnight** blockchains via the **Lace wallet** browser extension. Build, sign, and submit transactions — including **Plutus V3 smart contract interactions** — directly from a Unity WebGL game.
+A Unity WebGL plugin that connects your game to **Cardano** and **Midnight** blockchains via DApp-Connector v4 wallets (**1AM** or **Lace**). Build, sign, and submit transactions — including **Plutus V3 smart contracts on Cardano** and **Compact ZK smart contracts on Midnight** — directly from a Unity WebGL game.
+
+> **Recommended Midnight wallet: [1AM](https://1am.xyz/)** — built natively for Midnight, ships its own hosted proof server, and works out of the box on Preview. Lace is also supported but historically had dust-balancing issues that are fixed in v1.1.0.
+
+> **Confirmed on-chain (Midnight Preview, 2026-05-26):** Counter increment tx [`fcdb34478f…db64`](https://explorer.1am.xyz/tx/fcdb34478f37273a7117301e044954e438d16872f33a1bf716889a4be485db64?network=preview) — built, proved, signed, and submitted from a Unity WebGL build via the 1AM wallet. Counter contract `8c31306d…cd88dd`, increment landed at block 907291.
 
 ![Unity](https://img.shields.io/badge/Unity-6000.0.33f1-black?logo=unity)
 ![Cardano](https://img.shields.io/badge/Cardano-Preprod-blue)
@@ -11,14 +15,16 @@ A Unity WebGL plugin that connects your game to **Cardano** and **Midnight** blo
 
 ## What This Does
 
-- **Connect** to Lace (or Eternl/Nami) wallet from a Unity WebGL game via CIP-30
+- **Connect** to any **DApp-Connector v4 Midnight wallet** (1AM, Lace) — auto-discovery, no wallet hard-coding
+- **Connect** to CIP-30 Cardano wallets (Lace, Eternl, Nami) for ADA + Plutus V3
 - **Send ADA** payments with automatic UTxO selection and fee calculation
 - **Interact with Plutus V3 smart contracts** — full transaction building, ExUnits evaluation, signing, and submission
-- **Interact with Midnight ZK smart contracts** — Compact counter contract with zero-knowledge proofs on Midnight Preview
-- **Read on-chain state** — query UTxOs, balances, and inline datums from Blockfrost / Midnight indexer
-- **Aiken counter dApp** included as a working reference implementation
+- **Interact with Midnight ZK smart contracts** — Compact contracts with zero-knowledge proofs, end-to-end build → prove → sign → submit
+- **Read on-chain state** — query UTxOs / inline datums from Blockfrost; query Midnight contract state via the indexer's v4 GraphQL API
+- **Reference dApps included** — Aiken counter on Cardano, Compact counter on Midnight
 
-> **Confirmed on-chain:** Plutus V3 increment tx [`484b2f6a...`](https://preprod.cardanoscan.io/transaction/484b2f6a612c8d2a94cf122dde4d4f194bb5310f068103b5423bc877332c2186) on Cardano Preprod
+> **Cardano on-chain proof:** Plutus V3 increment tx [`484b2f6a…`](https://preprod.cardanoscan.io/transaction/484b2f6a612c8d2a94cf122dde4d4f194bb5310f068103b5423bc877332c2186)  
+> **Midnight on-chain proof:** Compact increment tx [`fcdb34478f…`](https://explorer.1am.xyz/tx/fcdb34478f37273a7117301e044954e438d16872f33a1bf716889a4be485db64?network=preview)
 
 ---
 
@@ -28,10 +34,11 @@ A Unity WebGL plugin that connects your game to **Cardano** and **Midnight** blo
 |-------------|---------|-------|
 | **Unity** | 6000.0.33f1+ (Unity 6) | WebGL build support must be installed |
 | **Browser** | Chrome or Firefox | Wallet extensions require a desktop browser |
-| **Lace Wallet** | Latest | Install from [lace.io](https://www.lace.io/) |
-| **Network** | Cardano Preprod / Midnight Preview | Switch Lace to the desired testnet |
+| **1AM Wallet** | Beta | **Recommended for Midnight.** Install from [1am.xyz](https://1am.xyz/). Native Midnight build, in-browser ZK proving, hosted proof server. |
+| **Lace Wallet** | 1.1.0+ | Recommended for Cardano. Install from [lace.io](https://www.lace.io/). Also supports Midnight but pre-1.1.0 versions have a dust-balancer bug (issue #383). |
+| **Network** | Cardano Preprod / Midnight Preview | Switch the wallet to the desired testnet in Settings |
 | **Test ADA** | — | Get from [Cardano Faucet](https://docs.cardano.org/cardano-testnets/tools/faucet/) |
-| **Test tDUST** | — | Get from [Midnight Faucet](https://midnight.network/test-faucet/) (for Midnight transactions) |
+| **Test tNIGHT / tDUST** | — | Get tNIGHT from [Midnight Faucet](https://midnight.network/test-faucet/). Dust regenerates automatically once NIGHT lands (~5 min cap fill). |
 | **Node.js + npm** | 18+ | Required to build `midnight-sdk.bundle.js` from source |
 
 The CSL WASM bundle is pre-built and included. The Midnight SDK bundle (`midnight-sdk.bundle.js`) must be rebuilt from source if you change `web/midnight-bridge/src/midnight-unity-bridge.ts`.
@@ -101,14 +108,17 @@ python -m http.server 8080
 npx serve YourBuildFolder
 ```
 
-Open `http://localhost:8080` in Chrome/Firefox with Lace installed.
+Open `http://localhost:8080` in Chrome/Firefox with **1AM and/or Lace** installed.
 
 ### 7. Connect and Interact
 
-1. Click **Connect Wallet** — approve in the Lace popup
-2. Your address and balance appear in the UI
-3. Click **Increment Counter** to submit a Plutus V3 transaction
-4. Watch the counter value update on-chain
+1. Click **Connect Midnight** — approve in the 1AM (or Lace) popup
+2. Your shielded address and balances appear in the UI
+3. Click **Read Counter** — current on-chain value is displayed
+4. Click **Increment Counter** — wallet pops, you sign, tx submits, counter increments
+5. Click Read again to verify the on-chain state moved
+
+**For Cardano:** click **Connect Wallet** (Cardano section), approve, then **Increment Counter** for the Plutus V3 path.
 
 ---
 
@@ -328,21 +338,25 @@ Full Aiken counter dApp increment from Unity WebGL. Confirmed on-chain on Prepro
 ### Milestone 3 — Midnight Network Integration ✅
 Connect to Midnight Preprod via Lace's Midnight DApp Connector API v4.0.x. Shielded addresses, tDUST balance, and configuration retrieval.
 
-### Milestone 4 — Counter Smart Contract on Midnight � _ALMOST COMPLETE — tx flow fixed, pending dust + live network test_
-Read **and** increment the live Counter contract on **Midnight Preview** at `8c31306d…cd88dd`. Unity C# API: `MidnightSDK.ReadCounter()`, `MidnightSDK.IncrementCounter()`.
+### Milestone 4 — Counter Smart Contract on Midnight ✅ **COMPLETE**
+Read **and** increment the live Counter contract on **Midnight Preview** at `8c31306d…cd88dd` from a Unity WebGL build. Unity C# API: `MidnightSDK.ReadCounter()`, `MidnightSDK.IncrementCounter()`.
 
-- ✅ `ReadCounter()` — queries indexer v4 GraphQL, returns the on-chain `round`.
-- ✅ `IncrementCounter()` builds → balances → signs → submits a hex-encoded transaction via Lace v4. First on-chain submit (2026-05-19): [`2f0ee3e3…e8f4`](https://explorer.preview.midnight.network/transactions/2f0ee3e3fb0d5c57622797a45493709210e9b27cec44b3dac6b432d74fc0e8f4).
-- ✅ **Session 05 fixes (2026-05-22):**
-  - `submitTransaction` returning `undefined` = **success** (per v4 spec), not failure
-  - Removed broken `balanceSealedTransaction` step — `balanceUnsealedTransaction` already returns a fully sealed tx
-  - Added `getTxHistory()` post-submission lookup to capture the wallet's canonical txHash
-  - Tagged: `v1.1.0-midnight-counter-almost-complete`
-- 🟡 **Pending:** One more live test with valid tDUST balance to confirm the counter increments on-chain. `publicDataProvider.watchForTxData(txId)` can hang indefinitely — **mitigation:** 2-minute timeout + manual `ReadCounter()` polling fallback.
+- ✅ **End-to-end working:** Confirmed-on-chain increment tx [`fcdb34478f…db64`](https://explorer.1am.xyz/tx/fcdb34478f37273a7117301e044954e438d16872f33a1bf716889a4be485db64?network=preview) on Midnight Preview, block 907291 (2026-05-26).
+- ✅ `ReadCounter()` decodes the on-chain `round` via `Counter.ledger(contractState.data)`. After increment: returns `1`, then `2`, etc.
+- ✅ `IncrementCounter()` builds → proves → balances → signs → submits via DApp-Connector v4. Works with both **1AM** (recommended) and **Lace 1.1.0+**.
+- ✅ **Wallet-agnostic provider discovery:** auto-detects any v4 wallet under `window.midnight.*` (matched by `apiVersion` starting with `4.`), no per-wallet hard-coding.
+- ✅ Tagged: `v1.2.0-midnight-counter-end-to-end`
 
-> **Key learning during the 2026-05-19 fix:** Lace dApp connector **v4** is **string-based** — `balanceUnsealedTransaction` / `submitTransaction` take hex-encoded transaction *strings*, not the raw wasm-bindgen `Transaction` object. The bridge serializes (`tx.serialize()` → hex) at the wallet boundary. See `handover_01.md` §⭐ Session 03 for the root-cause walkthrough.
+**Session 06 fixes (2026-05-26):**
+- Broadened `isLaceProvider` → generic v4 detection (works for 1AM + Lace + future v4 wallets)
+- Fixed `submitTx` over-eagerly overriding the correct local txHash with `getTxHistory()[0].txHash` (which can be a different tx — e.g. dust registration)
+- Fixed `readCounter` decoding — was reading non-existent `contractState.publicLedgerState.round`; now uses `Counter.ledger(contractState.data).round` per the contract bindings
 
-> **Key learning during the 2026-05-22 fix:** `balanceSealedTransaction` is for adding MORE balance to an already-sealed tx, not a required second step. Calling it after `balanceUnsealedTransaction` shuts down the wallet's RemoteApi channel (`RemoteApiShutdownError`).
+**Earlier learnings still apply:**
+
+> **2026-05-19:** DApp-Connector v4 is **hex-string-based** — `balanceUnsealedTransaction` / `submitTransaction` take hex-encoded transaction *strings*, not the raw wasm-bindgen `Transaction` object.
+
+> **2026-05-22:** `submitTransaction` returning `undefined` is **success** (per v4 spec), not failure. `balanceSealedTransaction` is for adding more balance to an already-sealed tx, not a required second step.
 
 ### Milestone 5 — Expanded Cardano System 🔜
 Multi-asset support, reference scripts, proper coin selection, stake delegation, multi-wallet.
@@ -433,10 +447,10 @@ These are copied verbatim from `node_modules/@midnight-ntwrk/counter-contract/ma
 | Indexer GraphQL | `https://indexer.preview.midnight.network/api/v4/graphql` |
 | Indexer WS | `wss://indexer.preview.midnight.network/api/v4/graphql` |
 | Proof server | `https://proof-server.preview.midnight.network` _(public)_ — wallet-provided URI takes precedence. `proverServerUri` is deprecated in v4 in favour of `api.getProvingProvider()` (see PROJECT_PLAN §1.8) |
-| Current build tag | `v1.1.0-midnight-counter-almost-complete` |
-| Wallet | Lace browser extension (`window.midnight.<uuid>`) — **v4 dApp-connector API: all tx methods are hex-string-based** (see PROJECT_PLAN §5.15) |
+| Current build tag | `v1.2.0-midnight-counter-end-to-end` |
+| Wallets | Any DApp-Connector v4 wallet under `window.midnight.<key>` — currently **1AM** (recommended) and **Lace 1.1.0+**. All tx methods are **hex-string-based** (see PROJECT_PLAN §5.15) |
 | Live counter contract | `8c31306d717dd2b79f30785ae7f0f5241f6f891d63441827395d8be1fecd88dd` |
-| First successful increment tx | [`2f0ee3e3fb0d5c57622797a45493709210e9b27cec44b3dac6b432d74fc0e8f4`](https://explorer.preview.midnight.network/transactions/2f0ee3e3fb0d5c57622797a45493709210e9b27cec44b3dac6b432d74fc0e8f4) |
+| Latest successful increment tx | [`fcdb34478f37273a7117301e044954e438d16872f33a1bf716889a4be485db64`](https://explorer.1am.xyz/tx/fcdb34478f37273a7117301e044954e438d16872f33a1bf716889a4be485db64?network=preview) (2026-05-26, block 907291) |
 
 ### Build commands
 
@@ -628,14 +642,16 @@ The Midnight DApp Connector requires two phases:
 
 | Problem | Solution |
 |---------|----------|
-| **"Lace Not Installed"** | Install Lace browser extension from [lace.io](https://www.lace.io/) |
+| **No Midnight wallet detected** | Install [1AM](https://1am.xyz/) (recommended) or [Lace 1.1.0+](https://www.lace.io/). After installing, hard-refresh (`Ctrl+Shift+R`) so `window.midnight.*` populates |
 | **Nothing happens on Connect** | Check browser console (F12). Must be served over HTTP, not `file://` |
-| **"User rejected"** | User declined in the Lace popup — expected behavior |
-| **Transaction fails** | Open DevTools (F12), look for `[IncrementCSL]` logs. See error table above |
-| **"No UTxOs available"** | Fund your wallet from the [Preprod faucet](https://docs.cardano.org/cardano-testnets/tools/faucet/) |
-| **Dust balance shows 0** | Resync Lace wallet (toggle Midnight Preview off/on) or top up tDUST from the [Midnight faucet](https://midnight.network/test-faucet/). Dust is required for Midnight tx fees |
+| **"User rejected"** | User declined in the wallet popup — expected behavior |
+| **Cardano tx fails** | Open DevTools (F12), look for `[IncrementCSL]` logs. See CSL workarounds table above |
+| **"No UTxOs available"** | Fund your wallet from the [Cardano Preprod faucet](https://docs.cardano.org/cardano-testnets/tools/faucet/) |
+| **`dustBalance: { cap: 0 }`** | NIGHT not yet registered for dust generation. Top up tNIGHT from the [Midnight faucet](https://midnight.network/test-faucet/) and wait 2–5 min for cap to fill. Dust generates from registered NIGHT UTxOs. |
+| **Lace dust shows 0 despite NIGHT balance** | Lace pre-1.1.0 has a dust-balancer bug (issue #383) — upgrade Lace, or switch to **1AM** which is unaffected |
+| **`readCounter` returns wrong value** | Hard-refresh and bump `?v=` in `index.html`. The decoder uses `Counter.ledger(contractState.data)` — if you've vendored a different contract, ensure your contract package exports a top-level or namespaced `ledger` function |
 | **Stale JS after rebuild** | Bump `?v=` in `index.html` or hard-refresh. WebGL aggressively caches |
-| **Wrong network** | Switch Lace to Preprod or Preview testnet in wallet settings |
+| **Wrong network** | Switch the wallet to Preprod (Cardano) or Preview (Midnight) in wallet settings |
 
 ### Console Log Prefixes
 
@@ -664,9 +680,12 @@ The Midnight DApp Connector requires two phases:
 
 ## Further Documentation
 
+- [`CUSTOM_CONTRACTS.md`](CUSTOM_CONTRACTS.md) — **Plan & guide** for adding your own Compact contracts to the bridge (status: design proposal, partial implementation)
 - [`Assets/Scripts/Cardano/README_CardanoBridge.md`](Assets/Scripts/Cardano/README_CardanoBridge.md) — Cardano bridge API, limitations, milestones
-- [`Assets/Scripts/Midnight/README_MidnightSetup.md`](Assets/Scripts/Midnight/README_MidnightSetup.md) — Lace/Midnight connection setup
+- [`Assets/Scripts/Midnight/README_MidnightSetup.md`](Assets/Scripts/Midnight/README_MidnightSetup.md) — Wallet/Midnight connection setup
 - [`Assets/WebGLTemplates/MidnightTemplate/README_PlutusV3_Transaction.md`](Assets/WebGLTemplates/MidnightTemplate/README_PlutusV3_Transaction.md) — Full Plutus V3 transaction building technical deep-dive
+- [`handover_01.md`](handover_01.md) — Session-by-session debug log (the trail of every Midnight integration trap and fix)
+- [`PROJECT_PLAN.md`](PROJECT_PLAN.md) — Version-pin matrix, architecture decisions, future work
 
 ---
 

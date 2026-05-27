@@ -271,24 +271,40 @@ function checkConnectMethod(provider: any, debugKey?: string): { hasConnect: boo
 }
 
 /**
- * Check if a provider looks like a Lace Midnight provider.
- * Matches: name === "lace" (case-insensitive) OR rdns contains "lace"
+ * Check if a provider looks like a v4-compliant Midnight wallet provider.
+ *
+ * Known providers:
+ *   - Lace:  name === "lace",  rdns contains "lace"
+ *   - 1AM:   name === "1AM",   rdns === "com.midnight.1am"
+ *
+ * Generic fallback: any object with apiVersion starting with "4." and a
+ * `connect` function (own or prototype) is treated as a valid v4 Midnight
+ * wallet. This makes the bridge work with future wallets that follow the
+ * DApp Connector v4 standard without code changes.
  */
 function isLaceProvider(provider: any): boolean {
   if (!provider || typeof provider !== 'object') return false;
-  
-  // Check name property
-  const name = provider.name;
-  if (typeof name === 'string' && name.toLowerCase() === 'lace') {
+
+  // Known-name matches (case-insensitive)
+  const name = typeof provider.name === 'string' ? provider.name.toLowerCase() : '';
+  if (name === 'lace' || name === '1am') {
     return true;
   }
-  
-  // Check rdns property (reverse DNS identifier)
-  const rdns = provider.rdns;
-  if (typeof rdns === 'string' && rdns.toLowerCase().includes('lace')) {
+
+  // Known-rdns matches
+  const rdns = typeof provider.rdns === 'string' ? provider.rdns.toLowerCase() : '';
+  if (rdns.includes('lace') || rdns.includes('1am') || rdns.includes('midnight')) {
     return true;
   }
-  
+
+  // Generic v4 detection: any provider exposing v4.x apiVersion + connect
+  const apiVersion = typeof provider.apiVersion === 'string' ? provider.apiVersion : '';
+  const hasConnect = typeof provider.connect === 'function'
+    || (provider && typeof Object.getPrototypeOf(provider)?.connect === 'function');
+  if (apiVersion.startsWith('4.') && hasConnect) {
+    return true;
+  }
+
   return false;
 }
 
