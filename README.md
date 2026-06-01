@@ -1,4 +1,4 @@
-# LaceUnityBridge
+# MidnightUnityConnector
 
 A Unity WebGL plugin that connects your game to **Cardano** and **Midnight** blockchains via DApp-Connector v4 wallets (**1AM** or **Lace**). Build, sign, and submit transactions — including **Plutus V3 smart contracts on Cardano** and **Compact ZK smart contracts on Midnight** — directly from a Unity WebGL game.
 
@@ -50,19 +50,14 @@ The CSL WASM bundle is pre-built and included. The Midnight SDK bundle (`midnigh
 ### 1. Clone and Open in Unity
 
 ```bash
-git clone https://github.com/paranormal39/LaceUnityBridge.git
+git clone https://github.com/paranormal39/MidnightUnityConnector.git
 ```
 
 Open the project in **Unity 6** (6000.0.33f1 or later). If prompted about a version mismatch, click "Continue" — minor version differences are fine.
 
-### 2. Select the WebGL Template
+### 2. Add Components to Your Scene
 
-1. **Edit → Project Settings → Player → WebGL tab**
-2. Under **Resolution and Presentation**, set **WebGL Template** to `MidnightTemplate`
-
-This template loads the Cardano Serialization Library (CSL), the wallet bridge scripts, the Plutus V3 increment logic, and the Midnight SDK bundle.
-
-### 3. Add Components to Your Scene
+> **Note:** The project ships with `MidnightTemplate` pre-selected. If you don't see the WebGL tab in Player Settings, ensure WebGL Build Support is installed via Unity Hub.
 
 Open `Assets/Scenes/SampleScene.unity` (or your own scene) and add:
 
@@ -77,7 +72,7 @@ Open `Assets/Scenes/SampleScene.unity` (or your own scene) and add:
 4. Add the `CardanoBridge` component (handles transactions)
 5. Optionally add `CounterReader` to read the on-chain counter value
 
-### 4. Rebuild the Midnight SDK Bundle (if needed)
+### 3. Rebuild the Midnight SDK Bundle (if needed)
 
 If you modify `web/midnight-bridge/src/midnight-unity-bridge.ts` or any of its dependencies:
 
@@ -89,13 +84,13 @@ npm run build:copy   # builds dist/midnight-sdk.bundle.js + copies to Unity asse
 
 Then bump the cache-bust `?v=` in `Assets/WebGLTemplates/MidnightTemplate/index.html` to force browser reload.
 
-### 5. Build for WebGL
+### 4. Build for WebGL
 
 1. **File → Build Settings → WebGL → Switch Platform**
 2. Click **Build** (or **Build and Run**)
 3. Choose an output folder
 
-### 6. Serve and Test
+### 5. Serve and Test
 
 WebGL builds must be served over HTTP (wallet extensions won't inject on `file://`):
 
@@ -110,7 +105,7 @@ npx serve YourBuildFolder
 
 Open `http://localhost:8080` in Chrome/Firefox with **1AM and/or Lace** installed.
 
-### 7. Connect and Interact
+### 6. Connect and Interact
 
 1. Click **Connect Midnight** — approve in the 1AM (or Lace) popup
 2. Your shielded address and balances appear in the UI
@@ -125,7 +120,7 @@ Open `http://localhost:8080` in Chrome/Firefox with **1AM and/or Lace** installe
 ## Project Structure
 
 ```
-LaceUnityBridge/
+MidnightUnityConnector/
 ├── Assets/
 │   ├── Plugins/WebGL/
 │   │   ├── CardanoBridgeWebGL.jslib    # Unity ↔ JS interop (Cardano)
@@ -388,7 +383,7 @@ The bundle is a single ~19 MB IIFE that exposes `window.MidnightSDK`. All Node-i
 
 ### Midnight Network packages (the actual SDK)
 
-> All pinned to the **Midnight 4.0.x line** because the live Preview network runs ledger-v8 `8.0.3`. See `PROJECT_PLAN.md` §1.5 for why every version below matters.
+> All pinned to the **Midnight 4.0.x line** because the live Midnight Preview network requires exact versions: ledger-v8 `8.0.3` and compact-runtime `0.15.0`.
 
 | Package | Version | Role | Docs |
 |---|---|---|---|
@@ -446,9 +441,9 @@ These are copied verbatim from `node_modules/@midnight-ntwrk/counter-contract/ma
 |---|---|
 | Indexer GraphQL | `https://indexer.preview.midnight.network/api/v4/graphql` |
 | Indexer WS | `wss://indexer.preview.midnight.network/api/v4/graphql` |
-| Proof server | `https://proof-server.preview.midnight.network` _(public)_ — wallet-provided URI takes precedence. `proverServerUri` is deprecated in v4 in favour of `api.getProvingProvider()` (see PROJECT_PLAN §1.8) |
+| Proof server | `https://proof-server.preview.midnight.network` _(public)_ — wallet-provided URI takes precedence. `proverServerUri` is deprecated in v4 in favour of `api.getProvingProvider()` |
 | Current build tag | `v1.2.0-midnight-counter-end-to-end` |
-| Wallets | Any DApp-Connector v4 wallet under `window.midnight.<key>` — currently **1AM** (recommended) and **Lace 1.1.0+**. All tx methods are **hex-string-based** (see PROJECT_PLAN §5.15) |
+| Wallets | Any DApp-Connector v4 wallet under `window.midnight.<key>` — currently **1AM** (recommended) and **Lace 1.1.0+**. All tx methods are **hex-string-based** (DApp-Connector v4 spec) |
 | Live counter contract | `8c31306d717dd2b79f30785ae7f0f5241f6f891d63441827395d8be1fecd88dd` |
 | Latest successful increment tx | [`fcdb34478f37273a7117301e044954e438d16872f33a1bf716889a4be485db64`](https://explorer.1am.xyz/tx/fcdb34478f37273a7117301e044954e438d16872f33a1bf716889a4be485db64?network=preview) (2026-05-26, block 907291) |
 
@@ -469,8 +464,6 @@ After `build:copy`, bump the cache-bust `?v=` in `Assets/WebGLTemplates/Midnight
 2. [Compact language tour](https://docs.midnight.network/develop/tutorial/building/compact) — how the counter contract is written.
 3. [`@midnight-ntwrk/midnight-js` README](https://github.com/midnightntwrk/midnight-js) — providers, `findDeployedContract`, `callTx`.
 4. [`example-counter`](https://github.com/midnightntwrk/example-counter) — the reference dApp our bridge mirrors.
-5. `PROJECT_PLAN.md` §1.5 (this repo) — version-pin matrix and the traps we've already hit.
-6. `handover_01.md` (this repo) — the session-by-session debug log.
 
 ---
 
@@ -684,8 +677,6 @@ The Midnight DApp Connector requires two phases:
 - [`Assets/Scripts/Cardano/README_CardanoBridge.md`](Assets/Scripts/Cardano/README_CardanoBridge.md) — Cardano bridge API, limitations, milestones
 - [`Assets/Scripts/Midnight/README_MidnightSetup.md`](Assets/Scripts/Midnight/README_MidnightSetup.md) — Wallet/Midnight connection setup
 - [`Assets/WebGLTemplates/MidnightTemplate/README_PlutusV3_Transaction.md`](Assets/WebGLTemplates/MidnightTemplate/README_PlutusV3_Transaction.md) — Full Plutus V3 transaction building technical deep-dive
-- [`handover_01.md`](handover_01.md) — Session-by-session debug log (the trail of every Midnight integration trap and fix)
-- [`PROJECT_PLAN.md`](PROJECT_PLAN.md) — Version-pin matrix, architecture decisions, future work
 
 ---
 

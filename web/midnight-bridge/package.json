@@ -5,7 +5,8 @@
   "scripts": {
     "build": "node build.mjs",
     "build:copy": "node build.mjs && node scripts/copy-to-unity.js",
-    "copy": "node scripts/copy-to-unity.js"
+    "copy": "node scripts/copy-to-unity.js",
+    "test": "node --test"
   },
   "dependencies": {
     "@meshsdk/midnight-setup": "^1.9.0-beta.98",

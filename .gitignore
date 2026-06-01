@@ -66,3 +66,6 @@ package-lock.json
 web/mesh-bridge/node_modules/
 web/csl-bundle/node_modules/
 Assets/WebGLTemplates/MidnightTemplate/TemplateData/node_modules/
+
+# Internal development documents (not for distribution)
+documents/
