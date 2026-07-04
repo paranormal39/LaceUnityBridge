@@ -279,7 +279,7 @@ MidnightSDK.CallContract("your-contract", "myCircuit", argsJson, onSuccess, onEr
 ### Things this design **doesn't** solve
 
 - **Dynamic on-chain contract download.** Compact contracts compile to JS + WASM that must be in the bundle. This is a fundamental constraint of the `@midnight-ntwrk/midnight-js-contracts` SDK; not a bridge limitation.
-- **Cross-version contract compatibility.** A contract compiled with `compactc +0.30.0` cannot run inside a bridge built against `compact-runtime 0.16.0`. Version pin matrix in `@/Users/.../PROJECT_PLAN.md:83-99` still applies per contract.
+- **Cross-version contract compatibility.** A contract compiled with `compactc +0.30.0` cannot run inside a bridge built against `compact-runtime 0.16.0`. The version-pin matrix in [`web/midnight-bridge/README.md`](web/midnight-bridge/README.md) still applies per contract.
 - **Wallet permission scoping.** Each `callContract` requires a wallet popup and full v4 authorization. No bulk approval.
 - **Multi-contract atomic transactions.** Each circuit call is its own transaction; the bridge does not currently compose multiple contract calls into a single tx.
 
@@ -301,9 +301,9 @@ MidnightSDK.CallContract("your-contract", "myCircuit", argsJson, onSuccess, onEr
 
 ## Cross-references
 
-- `@/Users/.../README.md` — top-level project doc, links here.
-- `@/Users/.../PROJECT_PLAN.md` — version-pin matrix that any new contract must respect.
-- `@/Users/.../web/midnight-bridge/src/midnight-unity-bridge.ts` — bridge to be refactored.
+- `README.md` — top-level project doc, links here.
+- `web/midnight-bridge/README.md` — version-pin matrix that any new contract must respect.
+- `web/midnight-bridge/src/midnight-unity-bridge.ts` — bridge to be refactored.
 - `@/Users/.../web/midnight-bridge/vendor/counter-contract/` — reference vendored contract.
 - `@/Users/.../Assets/StreamingAssets/zk/counter/` — reference ZK key layout.
 

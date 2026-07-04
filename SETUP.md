@@ -1,8 +1,8 @@
-# LaceUnityBridge — Quick Setup
+# MidnightUnityConnector — Quick Setup
 
 A short, opinionated guide to get a brand-new clone running end-to-end against **Cardano Preprod** and **Midnight Preview** in under ~20 minutes.
 
-> **2026-05-19:** the Midnight side now submits real transactions through Lace v4 — see [`PROJECT_PLAN.md` §1.5 fix matrix](PROJECT_PLAN.md#15--real-read--increment-half-day--green-submit-works-finalization-read-back-pending). If `incrementCounter()` looks stuck after you click it, that's the **`watchForTxData`** awaiting Preview finalization (~30–90 s) — not a hang.
+> **Note:** the Midnight side submits real transactions through DApp-Connector v4 wallets (1AM / Lace). If `incrementCounter()` looks stuck after you click it, that's the **`watchForTxData`** awaiting Preview finalization (~30–90 s) — not a hang.
 
 If you only want a high-level project tour, read `README.md` first. This doc is the “do these steps in order” version.
 
@@ -30,8 +30,8 @@ Faucets:
 ## 1. Clone & open in Unity
 
 ```powershell
-git clone https://github.com/paranormal39/LaceUnityBridge.git
-cd LaceUnityBridge
+git clone https://github.com/paranormal39/MidnightUnityConnector.git
+cd MidnightUnityConnector
 ```
 
 Open the folder in Unity Hub → it auto-installs WebGL support if missing. If Unity warns about a version mismatch, click **Continue**.
@@ -40,10 +40,12 @@ Open the folder in Unity Hub → it auto-installs WebGL support if missing. If U
 
 ## 2. Project Settings (one-time)
 
-1. **Edit → Project Settings → Player → WebGL tab**
-2. **Resolution and Presentation → WebGL Template** = `MidnightTemplate`
-3. **Publishing Settings → Compression Format** = `Disabled` (recommended for local dev — avoids `.br` MIME issues)
-4. **Other Settings → Color Space** = `Linear` (only if you care about visuals)
+> The project ships with **`MidnightTemplate` pre-selected** — you don't need to set it. If you don't see the WebGL tab in Player Settings, install **WebGL Build Support** via Unity Hub.
+
+Optional tweaks for local dev:
+
+1. **Publishing Settings → Compression Format** = `Disabled` (recommended for local dev — avoids `.br` MIME issues)
+2. **Other Settings → Color Space** = `Linear` (only if you care about visuals)
 
 ---
 
@@ -180,7 +182,7 @@ Other bundles:
 | Folder | When to rebuild |
 |--------|-----------------|
 | `web/midnight-bridge/` | **Active** — Midnight wallet + indexer + counter glue |
-| `web/midnight-bundle/` | Legacy/experimental scaffold (see PROJECT_PLAN.md — slated for removal) |
+| `web/midnight-bundle/` | Legacy/experimental scaffold — slated for removal |
 | `web/csl-bundle/` | Only if you upgrade Cardano Serialization Lib |
 | `web/mesh-bridge/` | Legacy Mesh experiment — **not used at runtime** |
 
@@ -204,7 +206,7 @@ To swap the Counter for *your* Compact contract:
    (window as any).MidnightSDK.witnesses = MyContract.witnesses;
    ```
 4. `npm run build:copy` to refresh the Unity bundle.
-5. Update the contract address in `MidnightDiagnostics.cs` (or wire it through a runtime input field — see PROJECT_PLAN.md Phase 2).
+5. Update the contract address in `MidnightDiagnostics.cs` (or wire it through a runtime input field — see [`CUSTOM_CONTRACTS.md`](CUSTOM_CONTRACTS.md)).
 6. ZK keys must be **served** by the WebGL host. Place them under `Assets/WebGLTemplates/MidnightTemplate/TemplateData/zk/<contract-name>/` and configure `zkConfigProvider` to read from `/StreamingAssets/zk/...` or the template path.
 
 A worked example (the Counter) lives at `Assets/WebGLTemplates/MidnightTemplate/midnight-counter-bindings.js`.
@@ -249,6 +251,6 @@ Console log prefixes are listed at the bottom of `README.md`.
 ## 11. Where to go next
 
 - `README.md` — full architectural overview
-- `PROJECT_PLAN.md` — phased roadmap, cut-list, multi-contract plan
+- `CUSTOM_CONTRACTS.md` — guide for wiring your own Compact contracts
 - `Assets/WebGLTemplates/MidnightTemplate/README_PlutusV3_Transaction.md` — Cardano deep dive
 - `Assets/Scripts/Midnight/README_MidnightSetup.md` — Lace/Midnight specifics
